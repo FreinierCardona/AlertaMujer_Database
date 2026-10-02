@@ -1,0 +1,2 @@
+-- Technical roles, membership, and ownership remain bootstrap infrastructure.
+-- Their credentials stay outside Liquibase so rollback followed by update can reconnect safely.

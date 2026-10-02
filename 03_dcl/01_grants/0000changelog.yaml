@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-006-02-configure-minimum-application-privileges
+      author: FreinierCardona
+      labels: "hu-db-006,dcl,grants,security"
+      comment: Applies schema access and default privileges for the application role.
+      changes:
+        - sqlFile:
+            path: 001_configure_minimum_application_privileges.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/001_configure_minimum_application_privileges.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
