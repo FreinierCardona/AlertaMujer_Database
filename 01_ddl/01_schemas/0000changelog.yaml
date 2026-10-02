@@ -1,1 +1,106 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-005-01-create-configuration-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the configuration functional schema.
+      changes:
+        - sqlFile:
+            path: 001_create_configuration_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/001_create_configuration_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-02-create-identity-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the identity functional schema.
+      changes:
+        - sqlFile:
+            path: 002_create_identity_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/002_create_identity_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-03-create-profile-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the profile functional schema.
+      changes:
+        - sqlFile:
+            path: 003_create_profile_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/003_create_profile_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-04-create-contacts-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the contacts functional schema.
+      changes:
+        - sqlFile:
+            path: 004_create_contacts_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/004_create_contacts_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-05-create-emergency-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the emergency functional schema.
+      changes:
+        - sqlFile:
+            path: 005_create_emergency_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/005_create_emergency_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-06-create-notification-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the notification functional schema.
+      changes:
+        - sqlFile:
+            path: 006_create_notification_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/006_create_notification_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-005-07-create-audit-schema
+      author: FreinierCardona
+      labels: "hu-db-005,ddl,base,schemas"
+      comment: Creates the audit functional schema.
+      changes:
+        - sqlFile:
+            path: 007_create_audit_schema.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/01_schemas/007_create_audit_schema.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
