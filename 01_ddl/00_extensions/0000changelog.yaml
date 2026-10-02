@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-004-01-enable-citext-extension
+      author: FreinierCardona
+      labels: "hu-db-004,ddl,base,extensions"
+      comment: Enables citext for AlertaMujer without creating an extensions schema.
+      changes:
+        - sqlFile:
+            path: 001_enable_citext_extension.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/00_extensions/001_enable_citext_extension.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
