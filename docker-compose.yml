@@ -4,10 +4,10 @@ name: ${COMPOSE_PROJECT_NAME:-alertamujer-db}
 # BASE DE DATOS ÚNICA DE ALERTAMUJER
 #
 # Uso:
-#   docker compose up postgres -d
+#   docker compose up
 #
-# Liquibase se integrará en la siguiente etapa como herramienta de versionado;
-# este archivo no ejecuta migraciones ni crea tablas de negocio.
+# PostgreSQL inicia primero y Liquibase aplica los changesets pendientes
+# cuando el healthcheck de la base de datos es satisfactorio.
 # =============================================================================
 
 services:
@@ -46,6 +46,29 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+
+  liquibase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: alertamujer-liquibase:4.33
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+    networks:
+      - alertamujer_db_network
+    entrypoint:
+      - liquibase
+      - --search-path=/workspace
+      - --changeLogFile=changelog/changelog-master.yaml
+      - --url=jdbc:postgresql://postgres:${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}/${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      - --username=${POSTGRES_USER:?POSTGRES_USER is required in .env}
+      - --password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+    command: ["update"]
 
 volumes:
   alertamujer_db_data:
