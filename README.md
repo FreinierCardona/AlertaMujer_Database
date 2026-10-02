@@ -49,6 +49,12 @@ Los changelogs internos son el lugar exclusivo para registrar changesets, respet
 
 Las contraseñas no se versionan. `POSTGRES_USER`/`POSTGRES_PASSWORD`, `APP_DB_USER`/`APP_DB_PASSWORD` y `MIGRATOR_DB_USER`/`MIGRATOR_DB_PASSWORD` se leen de `.env`. Los nombres de aplicación y migración están fijados como `alertamujer_app` y `alertamujer_migrator`; el script rechaza otros nombres. En un volumen existente, cambiar una contraseña en `.env` requiere ejecutar `./scripts/reconcile-technical-roles.ps1` para aplicarla en PostgreSQL; editar `.env` por sí solo no rota credenciales ya persistidas.
 
+## Configuración operativa global
+
+`configuration.system_configuration` contiene la única configuración global aprobada para SOS, heartbeat, evidencia, chat y OTP. La fila inicial usa los límites vigentes del proyecto; su PK y `CHECK (configuration_id = 1)` impiden una segunda configuración, todos los límites son positivos y el timeout de desconexión debe superar el intervalo de heartbeat.
+
+El backend consulta estos valores y conserva los hechos aplicados en sus entidades operativas futuras. `alertamujer_app` tiene únicamente `SELECT` sobre esta tabla; los cambios se entregan mediante un nuevo changeset con su rollback, nunca mediante una pantalla administrativa ni Compose.
+
 ## Inicio local
 
 Requiere Docker Desktop y el puerto `5434` disponible.
@@ -112,7 +118,7 @@ Antes de integrar una release, ejecute el ciclo completo en una base efímera:
 .\scripts\test-release.ps1 -ReleaseTag alertamujer-db-v0.7.0
 ```
 
-El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
+El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, la verificación de aceptación de `system_configuration`, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
 
 Los changesets ya aplicados son inmutables: una corrección se entrega en un changeset nuevo. Para cambios incompatibles, planifique expandir, migrar y contraer en releases separadas; el tag debe respetar el formato `alertamujer-db-vX.Y.Z`.
 

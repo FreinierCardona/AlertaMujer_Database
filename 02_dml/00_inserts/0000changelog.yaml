@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-008-02-seed-system-configuration
+      author: FreinierCardona
+      labels: "hu-db-008,dml,configuration,seed"
+      comment: Seeds the approved idempotent global operational configuration.
+      changes:
+        - sqlFile:
+            path: 001_seed_system_configuration.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/02_dml/00_inserts/001_seed_system_configuration.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
