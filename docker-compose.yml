@@ -13,7 +13,7 @@ name: ${COMPOSE_PROJECT_NAME:-alertamujer-db}
 services:
   postgres:
     image: postgres:17.11-alpine3.24
-    container_name: alertamujer_db
+    container_name: ${POSTGRES_CONTAINER_NAME:-alertamujer_db}
     restart: unless-stopped
     stop_grace_period: 30s
     command: ["postgres", "-p", "${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}"]
@@ -74,8 +74,8 @@ services:
 
 volumes:
   alertamujer_db_data:
-    name: alertamujer_db_data
+    name: ${POSTGRES_VOLUME_NAME:-alertamujer_db_data}
 
 networks:
   alertamujer_db_network:
-    name: alertamujer_db_network
+    name: ${POSTGRES_NETWORK_NAME:-alertamujer_db_network}
