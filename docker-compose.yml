@@ -24,6 +24,8 @@ services:
       POSTGRES_CONTAINER_PORT: ${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}
       APP_DB_USER: ${APP_DB_USER:?APP_DB_USER is required in .env}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required in .env}
+      MIGRATOR_DB_USER: ${MIGRATOR_DB_USER:?MIGRATOR_DB_USER is required in .env}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD:?MIGRATOR_DB_PASSWORD is required in .env}
       TZ: UTC
       PGTZ: UTC
       POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
@@ -66,8 +68,8 @@ services:
       - --search-path=/workspace
       - --changeLogFile=changelog/changelog-master.yaml
       - --url=jdbc:postgresql://postgres:${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}/${POSTGRES_DB:?POSTGRES_DB is required in .env}
-      - --username=${POSTGRES_USER:?POSTGRES_USER is required in .env}
-      - --password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      - --username=${MIGRATOR_DB_USER:?MIGRATOR_DB_USER is required in .env}
+      - --password=${MIGRATOR_DB_PASSWORD:?MIGRATOR_DB_PASSWORD is required in .env}
     command: ["update"]
 
 volumes:

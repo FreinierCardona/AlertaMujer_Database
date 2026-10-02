@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-006-01-create-technical-roles-and-transfer-schema-ownership
+      author: FreinierCardona
+      labels: "hu-db-006,dcl,roles,security"
+      comment: Configures technical roles after bootstrap and transfers functional schema ownership.
+      changes:
+        - sqlFile:
+            path: 001_create_technical_roles_and_transfer_schema_ownership.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/00_roles/001_create_technical_roles_and_transfer_schema_ownership.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
