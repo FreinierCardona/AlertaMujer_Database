@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-008-01-create-system-configuration-table
+      author: FreinierCardona
+      labels: "hu-db-008,ddl,configuration,table"
+      comment: Creates the typed singleton for approved AlertaMujer operational settings.
+      changes:
+        - sqlFile:
+            path: 001_create_system_configuration_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/001_create_system_configuration_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

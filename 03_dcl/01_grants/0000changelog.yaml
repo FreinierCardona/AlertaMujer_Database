@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/001_configure_minimum_application_privileges.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-008-03-grant-system-configuration-read-access
+      author: FreinierCardona
+      labels: "hu-db-008,dcl,configuration,security"
+      comment: Grants the application read-only access to the global configuration singleton.
+      changes:
+        - sqlFile:
+            path: 002_grant_system_configuration_read_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/002_grant_system_configuration_read_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
