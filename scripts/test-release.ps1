@@ -68,7 +68,7 @@ function Invoke-PostgresScalar {
   param([Parameter(Mandatory)][string]$Sql)
 
   $encodedSql = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Sql))
-  $probe = "printf '%s' '$encodedSql' | base64 -d | psql -X -v ON_ERROR_STOP=1 -U `"`$POSTGRES_USER`" -d `"`$POSTGRES_DB`" -At"
+  $probe = "printf '%s' '$encodedSql' | base64 -d | psql -X -q -v ON_ERROR_STOP=1 -U `"`$POSTGRES_USER`" -d `"`$POSTGRES_DB`" -At"
   $result = & docker compose --project-name $testProject exec --no-TTY postgres sh -c $probe
   if ($LASTEXITCODE -ne 0) {
     throw 'PostgreSQL verification failed.'
@@ -96,6 +96,82 @@ function Get-SchemaFingerprint {
   return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
 }
 
+function Test-SystemConfigurationAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  configuration_row configuration.system_configuration%ROWTYPE;
+BEGIN
+  SELECT *
+    INTO configuration_row
+    FROM configuration.system_configuration
+   WHERE configuration_id = 1;
+
+  IF NOT FOUND
+    OR configuration_row.default_sos_message <> 'Necesito ayuda. Estoy en una emergencia.'
+    OR configuration_row.heartbeat_interval_seconds <> 60
+    OR configuration_row.offline_timeout_seconds <> 180
+    OR configuration_row.max_evidence_count <> 10
+    OR configuration_row.max_evidence_size_bytes <> 1048576
+    OR configuration_row.max_chat_message_length <> 500
+    OR configuration_row.otp_ttl_minutes <> 180
+    OR configuration_row.otp_max_attempts <> 5
+    OR configuration_row.otp_max_resends <> 3
+    OR configuration_row.otp_resend_cooldown_minutes <> 300 THEN
+    RAISE EXCEPTION 'HU-DB-008 seed does not match the approved operational configuration.';
+  END IF;
+
+  IF (SELECT count(*) FROM configuration.system_configuration) <> 1 THEN
+    RAISE EXCEPTION 'HU-DB-008 configuration must contain exactly one row.';
+  END IF;
+
+  BEGIN
+    INSERT INTO configuration.system_configuration (
+      configuration_id, default_sos_message, heartbeat_interval_seconds,
+      offline_timeout_seconds, max_evidence_count, max_evidence_size_bytes,
+      max_chat_message_length, otp_ttl_minutes, otp_max_attempts,
+      otp_max_resends, otp_resend_cooldown_minutes
+    ) VALUES (2, 'Second row', 60, 180, 10, 1048576, 500, 180, 5, 3, 300);
+    RAISE EXCEPTION 'HU-DB-008 singleton constraint was not enforced.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE configuration.system_configuration
+       SET max_evidence_count = 0
+     WHERE configuration_id = 1;
+    RAISE EXCEPTION 'HU-DB-008 positive limits constraint was not enforced.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE configuration.system_configuration
+       SET offline_timeout_seconds = heartbeat_interval_seconds
+     WHERE configuration_id = 1;
+    RAISE EXCEPTION 'HU-DB-008 timeout-to-heartbeat constraint was not enforced.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'SELECT')
+  AND NOT has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-008 acceptance verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -111,6 +187,7 @@ try {
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
   Invoke-Liquibase -Phase 'update' -Command @('update')
+  Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
