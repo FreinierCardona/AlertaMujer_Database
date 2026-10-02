@@ -104,6 +104,18 @@ docker compose down
 
 Para reiniciar deliberadamente la base local, use `docker compose down --volumes`; elimina sus datos y no se puede deshacer.
 
+## Validación de releases
+
+Antes de integrar una release, ejecute el ciclo completo en una base efímera:
+
+```powershell
+.\scripts\test-release.ps1 -ReleaseTag alertamujer-db-v0.7.0
+```
+
+El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
+
+Los changesets ya aplicados son inmutables: una corrección se entrega en un changeset nuevo. Para cambios incompatibles, planifique expandir, migrar y contraer en releases separadas; el tag debe respetar el formato `alertamujer-db-vX.Y.Z`.
+
 ## Configuración
 
 `.env` contiene credenciales locales y no se versiona. `liquibase.properties` solo define la configuración reutilizable de Liquibase; Docker Compose entrega las credenciales al ejecutar el contenedor.
