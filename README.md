@@ -35,7 +35,7 @@ changelog/
         └── 00_transaction_blocks … 02_release_tags/0000changelog.yaml
 ```
 
-Los changelogs internos son el lugar exclusivo para registrar changesets, respetando el orden DDL, DML, DCL y TCL. La hu-db-004 habilita únicamente `citext` en el schema predeterminado de PostgreSQL, sin crear un schema de extensiones; las futuras PK funcionales usarán `uuid NOT NULL DEFAULT gen_random_uuid()`, sin habilitar `pgcrypto`, `uuid-ossp` ni UUIDv7.
+Los changelogs internos son el lugar exclusivo para registrar changesets, respetando el orden DDL, DML, DCL y TCL. La hu-db-004 habilita únicamente `citext` en el schema predeterminado de PostgreSQL, sin crear un schema de extensiones; las futuras PK funcionales usarán `uuid NOT NULL DEFAULT gen_random_uuid()`, sin habilitar `pgcrypto`, `uuid-ossp` ni UUIDv7. La hu-db-005 crea los schemas funcionales `configuration`, `identity`, `profile`, `contacts`, `emergency`, `notification` y `audit`.
 
 ## Inicio local
 
