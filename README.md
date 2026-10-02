@@ -1,74 +1,88 @@
 # AlertaMujer Database
 
-Repositorio de base de datos de AlertaMujer. Proporciona una instancia local, reproducible y persistente de PostgreSQL para el proyecto, junto con la estructura para organizar cambios de base de datos y sus reversiones.
+Repositorio de PostgreSQL y Liquibase de AlertaMujer. Centraliza la infraestructura local y el versionamiento ordenado de futuros cambios de base de datos; no contiene datos reales ni changesets de negocio iniciales.
 
-## Estructura
+## Estructura del repositorio
 
 ```text
 AlertaMujer_Database/
-├── 01_ddl/          # Estructuras de base de datos.
-├── 02_dml/          # Operaciones de datos.
-├── 03_dcl/          # Roles y permisos.
-├── 04_tcl/          # Operaciones transaccionales.
-├── 05_rollbacks/    # Reversiones.
-├── changelog/       # Versionado del esquema.
-├── docker/          # Inicialización técnica de PostgreSQL.
-├── scripts/         # Inicio y validación local.
-├── .env.example     # Plantilla de configuración.
-├── .gitignore       # Exclusiones de Git.
+├── 01_ddl/              # Estructuras de base de datos.
+├── 02_dml/              # Datos controlados.
+├── 03_dcl/              # Roles, permisos y políticas.
+├── 04_tcl/              # Operaciones transaccionales y versiones.
+├── 05_rollbacks/        # Reversiones de futuros changesets.
+├── changelog/           # Punto de entrada de Liquibase.
+├── docker/              # Inicialización técnica de PostgreSQL.
+├── scripts/             # Operación y verificación local.
+├── Dockerfile
 ├── docker-compose.yml
-└── README.md
+├── liquibase.properties
+└── .env.example
 ```
 
-Cada cambio se desarrolla por funcionalidad: incluye solo las estructuras, datos, permisos y rollback que esa funcionalidad necesita.
+## Estructura de changelogs
 
-## Ejecución local
+```text
+changelog/
+└── changelog-master.yaml
+    ├── ../01_ddl/changelog.yaml
+    │   └── 00_extensions … 10_indexes/0000changelog.yaml
+    ├── ../02_dml/changelog.yaml
+    │   └── 00_inserts … 04_patches/0000changelog.yaml
+    ├── ../03_dcl/changelog.yaml
+    │   └── 00_roles … 02_policies/0000changelog.yaml
+    └── ../04_tcl/changelog.yaml
+        └── 00_transaction_blocks … 02_release_tags/0000changelog.yaml
+```
 
-Requisitos: Docker Desktop en ejecución y puerto local `5434` disponible.
+Los changelogs internos empiezan vacíos y son el lugar exclusivo para registrar changesets futuros, respetando el orden DDL, DML, DCL y TCL.
 
-Después de clonar el repositorio, cree `.env` desde la plantilla y complete las credenciales locales. Docker Compose carga `.env` automáticamente; sin ese archivo no podrá iniciar PostgreSQL.
+## Inicio local
+
+Requiere Docker Desktop y el puerto `5434` disponible.
 
 ```powershell
 Copy-Item .env.example .env
-# Edite .env y reemplace POSTGRES_PASSWORD y APP_DB_PASSWORD.
-docker compose up -d postgres
-docker compose ps
+# Edite .env y defina POSTGRES_PASSWORD y APP_DB_PASSWORD.
+
+# PostgreSQL y Liquibase; Liquibase aplica los changesets pendientes.
+docker compose up
+
+# La misma operación en segundo plano.
+docker compose up -d
 ```
 
-Al iniciar, PostgreSQL crea o reutiliza el volumen persistente, ejecuta la inicialización técnica solo si la base aún no existe y publica el estado mediante el `healthcheck`.
+PostgreSQL inicia primero. Cuando su `healthcheck` es satisfactorio, Liquibase ejecuta `update` una vez y termina con el resultado de la migración. Liquibase se conecta internamente a `postgres:5433`; desde el equipo local PostgreSQL está disponible en `127.0.0.1:5434`.
 
-## Dónde se ejecuta
-
-| Recurso | Valor |
-| --- | --- |
-| Contenedor Docker | `alertamujer_db` |
-| Servicio Compose | `postgres` |
-| Base de datos | `alertamujer_db` |
-| Dirección desde el equipo local | `127.0.0.1:5434` |
-| Puerto dentro del contenedor | `5433` |
-| Volumen persistente | `alertamujer_db_data` |
-| Red Docker | `alertamujer_db_network` |
-
-El puerto se publica solo en `127.0.0.1`; no queda expuesto a otros equipos de la red. Desde otro contenedor conectado a `alertamujer_db_network`, PostgreSQL está disponible en `postgres:5433`.
-
-## Validación y operación
+## Liquibase
 
 ```powershell
-# Verifica salud, usuario de aplicación, UTF-8, UTC y persistencia.
+# Valida archivos y referencias sin aplicar cambios.
+docker compose run --rm liquibase validate
+
+# Ejecuta manualmente los changesets pendientes.
+docker compose run --rm liquibase update
+
+# Muestra el estado detallado.
+docker compose run --rm liquibase status --verbose
+```
+
+## Verificación y detención
+
+```powershell
+# Salud, usuario de aplicación, UTF-8, UTC y persistencia.
 .\scripts\verify-postgres.ps1
 
-# Confirma que el puerto local responde.
-Test-NetConnection 127.0.0.1 -Port 5434
-
-# Consulta los registros del servicio.
+# Estado y registros.
+docker compose ps
 docker compose logs postgres
 
-# Detiene el contenedor y conserva los datos del volumen.
+# Detiene contenedores y conserva el volumen.
 docker compose down
 ```
 
-Para eliminar deliberadamente la base local y sus datos, ejecute `docker compose down --volumes`. Esta operación no se puede deshacer sin una copia de respaldo.
+Para reiniciar deliberadamente la base local, use `docker compose down --volumes`; elimina sus datos y no se puede deshacer.
 
-## Seguridad y alcance
+## Configuración
 
-`.env.example` es una plantilla sin credenciales reales. `.env` contiene credenciales locales, está excluido de Git y no se debe publicar ni compartir. El repositorio no incluye datos reales, backend ni servicios externos; se limita a la plataforma PostgreSQL local y a la organización del trabajo de base de datos.
+`.env` contiene credenciales locales y no se versiona. `liquibase.properties` solo define la configuración reutilizable de Liquibase; Docker Compose entrega las credenciales al ejecutar el contenedor.

@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - include:
+      file: 00_transaction_blocks/0000changelog.yaml
+      relativeToChangelogFile: true
+      contextFilter: 04_tcl
+      labels: 00_transaction_blocks
+  - include:
+      file: 01_manual_recoveries/0000changelog.yaml
+      relativeToChangelogFile: true
+      contextFilter: 04_tcl
+      labels: 01_manual_recoveries
+  - include:
+      file: 02_release_tags/0000changelog.yaml
+      relativeToChangelogFile: true
+      contextFilter: 04_tcl
+      labels: 02_release_tags

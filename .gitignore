@@ -1,6 +1,6 @@
 *.log
 *.tmp
 .env
-liquibase.properties
 .env.*
 !.env.example
+liquibase-output.txt
