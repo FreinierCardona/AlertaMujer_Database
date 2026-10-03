@@ -104,3 +104,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/007_create_user_emergency_settings_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-015-01-create-emergency-contacts-table
+      author: FreinierCardona
+      labels: "hu-db-015,ddl,contacts,table"
+      comment: Creates the consented emergency-contact relationship between registered users.
+      changes:
+        - sqlFile:
+            path: 008_create_emergency_contacts_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/008_create_emergency_contacts_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

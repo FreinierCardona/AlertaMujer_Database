@@ -59,3 +59,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/004_create_user_sessions_current_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-015-02-create-emergency-contacts-indexes
+      author: FreinierCardona
+      labels: "hu-db-015,ddl,contacts,index"
+      comment: Enforces canonical contact pairs and indexes each participant role.
+      changes:
+        - sqlFile:
+            path: 005_create_emergency_contacts_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/005_create_emergency_contacts_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
