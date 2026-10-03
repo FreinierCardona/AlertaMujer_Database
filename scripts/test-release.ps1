@@ -1921,6 +1921,131 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyLocationsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000251', 'location_owner_251', 'Location', 'Owner',
+    'location.owner.251@example.test', '3000000251', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000261', '00000000-0000-0000-0000-000000000251',
+    'ACTIVE', 'Location SOS', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergency_locations (
+    location_id, emergency_id, latitude, longitude, accuracy_meters, captured_at, received_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000271', '00000000-0000-0000-0000-000000000261',
+     4.609710, -74.081750, 3.5, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000272', '00000000-0000-0000-0000-000000000261',
+     -90.000000, 180.000000, NULL, created_at_value + INTERVAL '1 minute', created_at_value + INTERVAL '1 minute');
+
+  BEGIN
+    INSERT INTO emergency.emergency_locations (
+      location_id, emergency_id, latitude, longitude, captured_at, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000273', '00000000-0000-0000-0000-000000000261',
+      90.000001, 0, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-019 allowed a latitude outside the documented range.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_locations (
+      location_id, emergency_id, latitude, longitude, captured_at, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000274', '00000000-0000-0000-0000-000000000261',
+      0, -180.000001, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-019 allowed a longitude outside the documented range.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_locations (
+      location_id, emergency_id, latitude, longitude, accuracy_meters, captured_at, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000275', '00000000-0000-0000-0000-000000000261',
+      0, 0, -0.1, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-019 allowed negative location accuracy.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_locations (
+      location_id, emergency_id, latitude, longitude, captured_at, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000276', '00000000-0000-0000-0000-000000000299',
+      0, 0, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-019 allowed a location without an emergency.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  IF to_regclass('emergency.ix_emergency_locations_emergency_received_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-019 did not create the documented latest-location index.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000251';
+
+  IF EXISTS (
+    SELECT 1
+      FROM emergency.emergency_locations
+     WHERE emergency_id = '00000000-0000-0000-0000-000000000261'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-019 did not cascade deleted emergency locations.';
+  END IF;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'emergency.emergency_locations', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergency_locations', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_locations', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_locations', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_locations', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-019 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyLocationsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('emergency.emergency_locations') IS NULL
+  AND to_regclass('emergency.ix_emergency_locations_emergency_received_at') IS NULL
+  AND to_regclass('emergency.emergencies') IS NOT NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-019 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1935,7 +2060,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-018)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-019)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2000,6 +2125,12 @@ try {
   Test-EmergencyStatusHistoryRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-018)' -Command @('update', '--label-filter=hu-db-018')
   Test-EmergencyStatusHistoryAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-019)' -Command @('update', '--label-filter=hu-db-019')
+  Test-EmergencyLocationsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-019)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyLocationsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-019)' -Command @('update', '--label-filter=hu-db-019')
+  Test-EmergencyLocationsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
