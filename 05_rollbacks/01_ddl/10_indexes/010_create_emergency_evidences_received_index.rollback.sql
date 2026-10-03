@@ -1,0 +1,1 @@
+DROP INDEX emergency.ix_emergency_evidences_emergency_received_at;

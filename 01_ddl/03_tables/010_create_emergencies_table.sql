@@ -23,7 +23,11 @@ CREATE TABLE emergency.emergencies (
 
   CONSTRAINT ck_emergencies_previous_operational_status
     CHECK (
-      (status = 'OFFLINE' AND previous_operational_status IN ('ACTIVE', 'IN_PROGRESS'))
+      (
+        status = 'OFFLINE'
+        AND previous_operational_status IS NOT NULL
+        AND previous_operational_status IN ('ACTIVE', 'IN_PROGRESS')
+      )
       OR (status <> 'OFFLINE' AND previous_operational_status IS NULL)
     ),
 
