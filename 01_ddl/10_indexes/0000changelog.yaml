@@ -89,3 +89,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/006_create_user_device_tokens_active_recent_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-017-02-create-emergencies-indexes
+      author: FreinierCardona
+      labels: "hu-db-017,ddl,emergency,index"
+      comment: Enforces one open SOS per user and supports per-user emergency history lookups.
+      changes:
+        - sqlFile:
+            path: 007_create_emergencies_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/007_create_emergencies_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

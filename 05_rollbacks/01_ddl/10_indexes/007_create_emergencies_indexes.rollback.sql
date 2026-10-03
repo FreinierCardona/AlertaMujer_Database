@@ -1,0 +1,2 @@
+DROP INDEX emergency.ix_emergencies_user_id_started_at;
+DROP INDEX emergency.ux_emergencies_open_user;
