@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/001_create_system_configuration_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-009-01-create-registration-requests-table
+      author: FreinierCardona
+      labels: "hu-db-009,ddl,identity,table"
+      comment: Creates the temporary registration request aggregate with protected credentials.
+      changes:
+        - sqlFile:
+            path: 002_create_registration_requests_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/002_create_registration_requests_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

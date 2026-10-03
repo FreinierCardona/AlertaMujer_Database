@@ -172,6 +172,147 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-RegistrationRequestsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-02 00:00:00+00';
+BEGIN
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email,
+    phone, password_hash, status, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000009', 'pending.user', 'Pending', 'User',
+    'pending.user@example.test', '3000000000', '$2b$12$pending-request-hash',
+    'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000010', 'PENDING.USER', 'Other', 'User',
+      'username.unique@example.test', '3000000001', '$2b$12$duplicate-username',
+      'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed a duplicate pending username.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000011', 'email.unique', 'Other', 'User',
+      'PENDING.USER@example.test', '3000000002', '$2b$12$duplicate-email',
+      'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed a duplicate pending email.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000012', 'phone.unique', 'Other', 'User',
+      'phone.unique@example.test', '3000000000', '$2b$12$duplicate-phone',
+      'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed a duplicate pending phone.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000013', 'invalid.status', 'Invalid', 'Status',
+      'invalid.status@example.test', '3000000003', '$2b$12$invalid-status',
+      'ACTIVE', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed a status outside its lifecycle.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000014', 'invalid.expiry', 'Invalid', 'Expiry',
+      'invalid.expiry@example.test', '3000000004', '$2b$12$invalid-expiry',
+      'PENDING', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed expires_at that does not follow created_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email,
+      phone, password_hash, status, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000015', 'invalid.phone', 'Invalid', 'Phone',
+      'invalid.phone@example.test', '2000000000', '$2b$12$invalid-phone',
+      'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-009 allowed a phone outside the documented format.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email,
+    phone, password_hash, status, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000016', 'completed.user', 'Completed', 'User',
+    'completed.user@example.test', '3000000005', '$2b$12$completed-request-hash',
+    'COMPLETED', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.registration_requests', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'identity.registration_requests', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.registration_requests', 'SELECT')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.registration_requests', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.registration_requests', 'TRUNCATE')
+  AND has_column_privilege('alertamujer_app', 'identity.registration_requests', 'registration_request_id', 'SELECT')
+  AND NOT has_column_privilege('alertamujer_app', 'identity.registration_requests', 'password_hash', 'SELECT')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-009 acceptance verification failed: $result"
+  }
+}
+
+function Test-RegistrationRequestsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.registration_requests') IS NULL
+  AND to_regnamespace('identity') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-009 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -188,6 +329,12 @@ try {
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
   Invoke-Liquibase -Phase 'update' -Command @('update')
   Test-SystemConfigurationAcceptance
+  Test-RegistrationRequestsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-009)' -Command @('rollback-count', '--count=3')
+  Test-RegistrationRequestsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-009)' -Command @('update')
+  Test-SystemConfigurationAcceptance
+  Test-RegistrationRequestsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
