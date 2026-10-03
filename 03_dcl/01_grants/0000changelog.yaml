@@ -149,3 +149,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/010_grant_user_emergency_settings_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-015-03-grant-emergency-contacts-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-015,dcl,contacts,security"
+      comment: Grants the application the emergency-contact lifecycle access.
+      changes:
+        - sqlFile:
+            path: 011_grant_emergency_contacts_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/011_grant_emergency_contacts_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
