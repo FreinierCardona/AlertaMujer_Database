@@ -149,3 +149,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/010_create_emergencies_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-018-01-create-emergency-status-history-table
+      author: FreinierCardona
+      labels: "hu-db-018,ddl,emergency,table"
+      comment: Creates the immutable ordered emergency lifecycle history.
+      changes:
+        - sqlFile:
+            path: 011_create_emergency_status_history_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/011_create_emergency_status_history_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
