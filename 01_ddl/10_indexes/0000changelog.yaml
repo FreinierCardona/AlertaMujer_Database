@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-009-02-create-registration-requests-pending-identity-indexes
+      author: FreinierCardona
+      labels: "hu-db-009,ddl,identity,index"
+      comment: Prevents duplicate normalized identities while their registration requests are pending.
+      changes:
+        - sqlFile:
+            path: 001_create_registration_requests_pending_identity_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/001_create_registration_requests_pending_identity_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
