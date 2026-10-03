@@ -59,3 +59,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/004_grant_users_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-011-02-grant-user-credentials-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-011,dcl,identity,security"
+      comment: Grants credential writes and non-secret metadata reads without exposing password hashes.
+      changes:
+        - sqlFile:
+            path: 005_grant_user_credentials_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/005_grant_user_credentials_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
