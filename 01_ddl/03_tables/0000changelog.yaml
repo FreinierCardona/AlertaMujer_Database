@@ -89,3 +89,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/006_create_user_sessions_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-014-01-create-user-emergency-settings-table
+      author: FreinierCardona
+      labels: "hu-db-014,ddl,profile,table"
+      comment: Creates the optional per-user SOS message personalization.
+      changes:
+        - sqlFile:
+            path: 007_create_user_emergency_settings_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/007_create_user_emergency_settings_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
