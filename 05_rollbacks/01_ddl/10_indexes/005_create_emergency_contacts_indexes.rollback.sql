@@ -1,0 +1,3 @@
+DROP INDEX contacts.ix_emergency_contacts_contact_user_id;
+DROP INDEX contacts.ix_emergency_contacts_owner_user_id;
+DROP INDEX contacts.ux_emergency_contacts_canonical_pair;

@@ -1220,6 +1220,193 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyContactsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000161', 'contact_owner_161', 'Contact', 'Owner', 'contact.owner.161@example.test', '3000000161', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000162', 'contact_user_162', 'Contact', 'User', 'contact.user.162@example.test', '3000000162', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000163', 'contact_user_163', 'Contact', 'User', 'contact.user.163@example.test', '3000000163', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000164', 'contact_user_164', 'Contact', 'User', 'contact.user.164@example.test', '3000000164', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000165', 'contact_user_165', 'Contact', 'User', 'contact.user.165@example.test', '3000000165', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000166', 'contact_owner_166', 'Contact', 'Owner', 'contact.owner.166@example.test', '3000000166', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000167', 'contact_user_167', 'Contact', 'User', 'contact.user.167@example.test', '3000000167', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO contacts.emergency_contacts (
+    contact_id, owner_user_id, contact_user_id, relationship_status,
+    expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000171',
+    '00000000-0000-0000-0000-000000000161',
+    '00000000-0000-0000-0000-000000000162', 'PENDING',
+    created_at_value + INTERVAL '24 hours', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000172',
+      '00000000-0000-0000-0000-000000000162',
+      '00000000-0000-0000-0000-000000000161', 'PENDING',
+      created_at_value + INTERVAL '24 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed the inverse duplicate contact pair.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000173',
+      '00000000-0000-0000-0000-000000000161',
+      '00000000-0000-0000-0000-000000000161', 'PENDING',
+      created_at_value + INTERVAL '24 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed a user to add itself as a contact.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000174',
+      '00000000-0000-0000-0000-000000000163',
+      '00000000-0000-0000-0000-000000000164', 'PENDING',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed a pending contact without expiration.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000175',
+      '00000000-0000-0000-0000-000000000163',
+      '00000000-0000-0000-0000-000000000165', 'ACCEPTED',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed a terminal contact without status_changed_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      status_changed_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000176',
+      '00000000-0000-0000-0000-000000000164',
+      '00000000-0000-0000-0000-000000000165', 'REJECTED',
+      created_at_value - INTERVAL '1 second', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed status_changed_at before creation.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO contacts.emergency_contacts (
+      contact_id, owner_user_id, contact_user_id, relationship_status,
+      expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000177',
+      '00000000-0000-0000-0000-000000000199',
+      '00000000-0000-0000-0000-000000000161', 'PENDING',
+      created_at_value + INTERVAL '24 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-015 allowed a contact without both registered users.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO contacts.emergency_contacts (
+    contact_id, owner_user_id, contact_user_id, relationship_status,
+    status_changed_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000178',
+    '00000000-0000-0000-0000-000000000166',
+    '00000000-0000-0000-0000-000000000167', 'ACCEPTED',
+    created_at_value, created_at_value, created_at_value
+  );
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000166';
+
+  IF EXISTS (
+    SELECT 1
+      FROM contacts.emergency_contacts
+     WHERE contact_id = '00000000-0000-0000-0000-000000000178'
+  ) OR NOT EXISTS (
+    SELECT 1
+      FROM identity.users
+     WHERE user_id = '00000000-0000-0000-0000-000000000167'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-015 did not cascade only the deleted account contact links.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id IN (
+     '00000000-0000-0000-0000-000000000161',
+     '00000000-0000-0000-0000-000000000162',
+     '00000000-0000-0000-0000-000000000163',
+     '00000000-0000-0000-0000-000000000164',
+     '00000000-0000-0000-0000-000000000165',
+     '00000000-0000-0000-0000-000000000167'
+   );
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'contacts.emergency_contacts', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'contacts.emergency_contacts', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'contacts.emergency_contacts', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'contacts.emergency_contacts', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'contacts.emergency_contacts', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-015 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyContactsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('contacts.emergency_contacts') IS NULL
+  AND to_regclass('contacts.ux_emergency_contacts_canonical_pair') IS NULL
+  AND to_regclass('contacts.ix_emergency_contacts_owner_user_id') IS NULL
+  AND to_regclass('contacts.ix_emergency_contacts_contact_user_id') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-015 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1234,7 +1421,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-014)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-015)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -1271,10 +1458,16 @@ try {
   Test-UserVerificationCodesAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-012)' -Command @('rollback-count', '--count=5')
   Test-UserVerificationCodesRollback
-  Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update')
+  Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update', '--label-filter=hu-db-012')
   Test-UserVerificationCodesAcceptance
   Test-UserSessionsAcceptance
   Test-UserEmergencySettingsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-015)' -Command @('update', '--label-filter=hu-db-015')
+  Test-EmergencyContactsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-015)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyContactsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-015)' -Command @('update', '--label-filter=hu-db-015')
+  Test-EmergencyContactsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
