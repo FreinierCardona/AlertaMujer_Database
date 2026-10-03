@@ -74,3 +74,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/005_create_emergency_contacts_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-016-02-create-user-device-tokens-active-recent-index
+      author: FreinierCardona
+      labels: "hu-db-016,ddl,notification,index"
+      comment: Indexes active tokens for the documented most-recent Android FCM selection.
+      changes:
+        - sqlFile:
+            path: 006_create_user_device_tokens_active_recent_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/006_create_user_device_tokens_active_recent_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

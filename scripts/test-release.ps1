@@ -1407,6 +1407,160 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UserDeviceTokensAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+  selected_device_token_id UUID;
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000181', 'device_owner_181', 'Device', 'Owner', 'device.owner.181@example.test', '3000000181', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000182', 'device_owner_182', 'Device', 'Owner', 'device.owner.182@example.test', '3000000182', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO notification.user_device_tokens (
+    device_token_id, user_id, fcm_token, platform, device_label, is_active,
+    last_seen_at, invalidated_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000191', '00000000-0000-0000-0000-000000000181', 'fcm-token-active-recent-191', 'ANDROID', 'Primary Android device', TRUE, created_at_value + INTERVAL '5 minutes', NULL, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000192', '00000000-0000-0000-0000-000000000181', 'fcm-token-inactive-192', 'ANDROID', 'Invalidated Android device', FALSE, created_at_value, created_at_value + INTERVAL '1 minute', created_at_value, created_at_value);
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000193', '00000000-0000-0000-0000-000000000182', 'fcm-token-active-recent-191', 'ANDROID', TRUE, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed a duplicate FCM token.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000194', '00000000-0000-0000-0000-000000000182', '   ', 'ANDROID', TRUE, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed a blank FCM token.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000195', '00000000-0000-0000-0000-000000000182', 'fcm-token-invalid-platform-195', 'IOS', TRUE, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed a platform outside the documented Android scope.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000196', '00000000-0000-0000-0000-000000000182', 'fcm-token-inactive-without-date-196', 'ANDROID', FALSE, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed an inactive token without invalidated_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, invalidated_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000197', '00000000-0000-0000-0000-000000000182', 'fcm-token-active-invalidated-197', 'ANDROID', TRUE, created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed an active token with an invalidation timestamp.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.user_device_tokens (
+      device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000198', '00000000-0000-0000-0000-000000000199', 'fcm-token-without-user-198', 'ANDROID', TRUE, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-016 allowed a token without a registered user.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO notification.user_device_tokens (
+    device_token_id, user_id, fcm_token, platform, is_active, last_seen_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000199', '00000000-0000-0000-0000-000000000182', 'fcm-token-cascade-199', 'ANDROID', TRUE, created_at_value, created_at_value, created_at_value
+  );
+
+  SELECT device_token_id
+    INTO selected_device_token_id
+    FROM notification.user_device_tokens
+   WHERE user_id = '00000000-0000-0000-0000-000000000181'
+     AND is_active
+   ORDER BY last_seen_at DESC NULLS LAST
+   LIMIT 1;
+
+  IF selected_device_token_id <> '00000000-0000-0000-0000-000000000191'
+    OR to_regclass('notification.ix_user_device_tokens_active_recent') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-016 does not support selecting the most recently seen active token.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000182';
+
+  IF EXISTS (
+    SELECT 1
+      FROM notification.user_device_tokens
+     WHERE device_token_id = '00000000-0000-0000-0000-000000000199'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-016 did not cascade the deleted user token.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000181';
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-016 acceptance verification failed: $result"
+  }
+}
+
+function Test-UserDeviceTokensRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('notification.user_device_tokens') IS NULL
+  AND to_regclass('notification.uq_user_device_tokens_fcm_token') IS NULL
+  AND to_regclass('notification.uq_user_device_tokens_id_user') IS NULL
+  AND to_regclass('notification.ix_user_device_tokens_active_recent') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-016 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1421,7 +1575,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-015)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-016)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -1468,6 +1622,12 @@ try {
   Test-EmergencyContactsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-015)' -Command @('update', '--label-filter=hu-db-015')
   Test-EmergencyContactsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-016)' -Command @('update', '--label-filter=hu-db-016')
+  Test-UserDeviceTokensAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-016)' -Command @('rollback-count', '--count=3')
+  Test-UserDeviceTokensRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-016)' -Command @('update', '--label-filter=hu-db-016')
+  Test-UserDeviceTokensAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

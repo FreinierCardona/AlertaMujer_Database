@@ -164,3 +164,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/011_grant_emergency_contacts_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-016-03-grant-user-device-tokens-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-016,dcl,notification,security"
+      comment: Grants the application only the FCM token lifecycle access required by the notification flow.
+      changes:
+        - sqlFile:
+            path: 012_grant_user_device_tokens_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/012_grant_user_device_tokens_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
