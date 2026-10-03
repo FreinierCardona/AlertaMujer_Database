@@ -149,3 +149,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/010_create_emergency_evidences_received_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-021-02-create-emergency-chat-messages-order-index
+      author: FreinierCardona
+      labels: "hu-db-021,ddl,emergency,index"
+      comment: Indexes per-emergency chat retrieval in server-time and stable identifier order.
+      changes:
+        - sqlFile:
+            path: 011_create_emergency_chat_messages_order_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/011_create_emergency_chat_messages_order_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

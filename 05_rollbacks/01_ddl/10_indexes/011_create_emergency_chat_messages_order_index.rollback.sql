@@ -1,0 +1,1 @@
+DROP INDEX emergency.ix_emergency_chat_messages_emergency_sent_at;
