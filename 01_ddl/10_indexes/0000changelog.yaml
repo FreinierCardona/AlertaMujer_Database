@@ -104,3 +104,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/007_create_emergencies_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-018-02-create-emergency-status-history-indexes
+      author: FreinierCardona
+      labels: "hu-db-018,ddl,emergency,index"
+      comment: Indexes stable per-emergency history reconstruction by occurrence and sequence.
+      changes:
+        - sqlFile:
+            path: 008_create_emergency_status_history_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/008_create_emergency_status_history_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

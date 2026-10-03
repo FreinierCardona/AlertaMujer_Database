@@ -194,3 +194,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/013_grant_emergencies_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-018-03-grant-emergency-status-history-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-018,dcl,emergency,security"
+      comment: Grants append-only emergency lifecycle history access to the application role.
+      changes:
+        - sqlFile:
+            path: 014_grant_emergency_status_history_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/014_grant_emergency_status_history_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
