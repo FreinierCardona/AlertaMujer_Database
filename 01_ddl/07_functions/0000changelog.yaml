@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/07_functions/001_create_identity_authentication_secret_read_functions.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-013-03-create-user-session-refresh-token-hash-read-function
+      author: FreinierCardona
+      labels: "hu-db-013,ddl,identity,security,function"
+      comment: Exposes a refresh-token hash only by session identifier, without table-level secret reads.
+      changes:
+        - sqlFile:
+            path: 002_create_user_session_refresh_token_hash_read_function.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/07_functions/002_create_user_session_refresh_token_hash_read_function.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

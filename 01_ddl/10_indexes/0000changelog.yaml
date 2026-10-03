@@ -44,3 +44,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/003_create_user_verification_codes_context_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-013-02-create-user-sessions-current-indexes
+      author: FreinierCardona
+      labels: "hu-db-013,ddl,identity,index"
+      comment: Indexes per-account revocation and scheduled session-expiration lookups.
+      changes:
+        - sqlFile:
+            path: 004_create_user_sessions_current_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/004_create_user_sessions_current_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

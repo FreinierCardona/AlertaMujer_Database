@@ -74,3 +74,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/005_create_user_verification_codes_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-013-01-create-user-sessions-table
+      author: FreinierCardona
+      labels: "hu-db-013,ddl,identity,table"
+      comment: Creates revocable renewable sessions without persisting clear refresh tokens.
+      changes:
+        - sqlFile:
+            path: 006_create_user_sessions_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/006_create_user_sessions_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
