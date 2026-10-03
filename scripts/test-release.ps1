@@ -9,6 +9,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($PSVersionTable.PSVersion -ge [Version]'7.3') {
+  $PSNativeCommandUseErrorActionPreference = $false
+}
+
 $testSuffix = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $testProject = "alertamujer-db-release-$testSuffix"
 $environmentOverrides = @{
@@ -23,7 +27,14 @@ $previousEnvironment = @{}
 function Invoke-Compose {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
-  & docker compose --project-name $testProject @Arguments
+  $composeErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    & docker compose --project-name $testProject @Arguments
+  } finally {
+    $ErrorActionPreference = $composeErrorActionPreference
+  }
+
   if ($LASTEXITCODE -ne 0) {
     throw "docker compose $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
   }
@@ -68,7 +79,7 @@ function Invoke-PostgresScalar {
   param([Parameter(Mandatory)][string]$Sql)
 
   $encodedSql = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Sql))
-  $probe = "printf '%s' '$encodedSql' | base64 -d | psql -X -q -v ON_ERROR_STOP=1 -U `"`$POSTGRES_USER`" -d `"`$POSTGRES_DB`" -At"
+  $probe = "printf '%s' '$encodedSql' | base64 -d | psql -X -q -v ON_ERROR_STOP=1 -p `"`$POSTGRES_CONTAINER_PORT`" -U `"`$POSTGRES_USER`" -d `"`$POSTGRES_DB`" -At"
   $result = & docker compose --project-name $testProject exec --no-TTY postgres sh -c $probe
   if ($LASTEXITCODE -ne 0) {
     throw 'PostgreSQL verification failed.'
@@ -313,6 +324,174 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UsersAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-02 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000010', 'alerta.user', 'Alerta', 'User',
+    'alerta.user@example.test', '3000000010', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, accepted_terms_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000011', 'ALERTA.USER', 'Other', 'User',
+      'username.unique@example.test', '3000000011', 'USER', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed a duplicate case-insensitive username.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, accepted_terms_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000012', 'email.unique', 'Other', 'User',
+      'ALERTA.USER@example.test', '3000000012', 'USER', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed a duplicate case-insensitive email.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, accepted_terms_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000013', 'phone.unique', 'Other', 'User',
+      'phone.unique@example.test', '3000000010', 'USER', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed a duplicate phone.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000014', 'terms.required', 'Terms', 'Required',
+      'terms.required@example.test', '3000000014', 'USER', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed self-registration without accepted terms.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000015', 'disabled.no.date', 'Disabled', 'NoDate',
+      'disabled.no.date@example.test', '3000000015', 'USER', 'DISABLED',
+      'ADMIN_CREATED', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed a disabled account without disabled_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, accepted_terms_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000016', 'invalid.role', 'Invalid', 'Role',
+      'invalid.role@example.test', '3000000016', 'CONTACT', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed an undocumented account role.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, accepted_terms_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000017', 'invalid.phone', 'Invalid', 'Phone',
+      'invalid.phone@example.test', '2000000017', 'USER', 'ENABLED',
+      'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed a phone outside the documented format.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000018', 'entity.admin', 'Entity', 'Admin',
+    'entity.admin@example.test', '3000000018', 'ENTITY_ADMIN', 'ENABLED',
+    'ADMIN_CREATED', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.users (
+      user_id, username, first_names, last_names, email, phone, role,
+      account_status, account_origin, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000019', 'second.admin', 'Second', 'Admin',
+      'second.admin@example.test', '3000000019', 'ENTITY_ADMIN', 'ENABLED',
+      'ADMIN_CREATED', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-010 allowed more than one ENTITY_ADMIN.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.users', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'identity.users', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'identity.users', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.users', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.users', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-010 acceptance verification failed: $result"
+  }
+}
+
+function Test-UsersRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.users') IS NULL
+  AND to_regclass('identity.ux_users_single_entity_admin') IS NULL
+  AND to_regclass('identity.registration_requests') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-010 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -327,14 +506,21 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update' -Command @('update')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 and HU-DB-010)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010')
   Test-SystemConfigurationAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-009)' -Command @('rollback-count', '--count=3')
   Test-RegistrationRequestsRollback
-  Invoke-Liquibase -Phase 'update (restore HU-DB-009)' -Command @('update')
+  Invoke-Liquibase -Phase 'update (restore HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-SystemConfigurationAcceptance
   Test-RegistrationRequestsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-010)' -Command @('update', '--label-filter=hu-db-010')
+  Test-UsersAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-010)' -Command @('rollback-count', '--count=3')
+  Test-UsersRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-010)' -Command @('update')
+  Test-UsersAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
@@ -382,7 +568,10 @@ THEN 'LOCKED' ELSE 'CLEAR' END;
   Write-Host "Release validation passed: $ReleaseTag; $changeSetCount changesets; schema fingerprint $firstFingerprint; no pending locks."
 } finally {
   if (-not $KeepEnvironment) {
-    & docker compose --project-name $testProject down --volumes --remove-orphans
+    $cleanupErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & docker compose --project-name $testProject down --volumes --remove-orphans 2>$null
+    $ErrorActionPreference = $cleanupErrorActionPreference
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "Could not fully remove the isolated release environment $testProject."
     }

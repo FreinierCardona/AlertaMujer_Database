@@ -44,3 +44,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/003_grant_registration_request_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-010-03-grant-users-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-010,dcl,identity,security"
+      comment: Grants the application the minimum account read and lifecycle access.
+      changes:
+        - sqlFile:
+            path: 004_grant_users_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/004_grant_users_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
