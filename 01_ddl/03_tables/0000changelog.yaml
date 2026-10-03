@@ -119,3 +119,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/008_create_emergency_contacts_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-016-01-create-user-device-tokens-table
+      author: FreinierCardona
+      labels: "hu-db-016,ddl,notification,table"
+      comment: Creates the per-device Android FCM token registry with invalidation integrity.
+      changes:
+        - sqlFile:
+            path: 009_create_user_device_tokens_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/009_create_user_device_tokens_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
