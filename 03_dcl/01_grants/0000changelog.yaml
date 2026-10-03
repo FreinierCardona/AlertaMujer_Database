@@ -179,3 +179,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/012_grant_user_device_tokens_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-017-03-grant-emergencies-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-017,dcl,emergency,security"
+      comment: Grants the application only the SOS emergency lifecycle access.
+      changes:
+        - sqlFile:
+            path: 013_grant_emergencies_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/013_grant_emergencies_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

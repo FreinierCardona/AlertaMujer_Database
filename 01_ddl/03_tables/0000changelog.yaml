@@ -134,3 +134,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/009_create_user_device_tokens_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-017-01-create-emergencies-table
+      author: FreinierCardona
+      labels: "hu-db-017,ddl,emergency,table"
+      comment: Creates the SOS emergency aggregate root with current lifecycle-state integrity.
+      changes:
+        - sqlFile:
+            path: 010_create_emergencies_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/010_create_emergencies_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

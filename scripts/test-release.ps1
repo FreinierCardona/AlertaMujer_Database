@@ -1561,6 +1561,171 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergenciesAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000201', 'emergency_owner_201', 'Emergency', 'Owner', 'emergency.owner.201@example.test', '3000000201', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000202', 'emergency_owner_202', 'Emergency', 'Owner', 'emergency.owner.202@example.test', '3000000202', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, last_heartbeat_at,
+    created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000211',
+    '00000000-0000-0000-0000-000000000201', 'ACTIVE',
+    'Necesito ayuda. Estoy en una emergencia.', created_at_value,
+    created_at_value + INTERVAL '1 minute', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000212',
+      '00000000-0000-0000-0000-000000000201', 'IN_PROGRESS',
+      'Second open SOS', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 allowed two open emergencies for one user.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000213',
+      '00000000-0000-0000-0000-000000000202', 'OFFLINE',
+      'Offline without previous operational status', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 allowed OFFLINE without ACTIVE or IN_PROGRESS as previous status.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000214',
+      '00000000-0000-0000-0000-000000000202', 'FINALIZED',
+      'Finalized without timestamp', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 allowed FINALIZED without finalized_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, previous_operational_status, message_snapshot,
+      started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000215',
+      '00000000-0000-0000-0000-000000000202', 'ACTIVE', 'ACTIVE',
+      'Operational status is only retained while offline', created_at_value,
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 retained previous operational status outside OFFLINE.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000216',
+      '00000000-0000-0000-0000-000000000202', 'ACTIVE', '   ',
+      created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 allowed a blank SOS message snapshot.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergencies (
+      emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000217',
+      '00000000-0000-0000-0000-000000000299', 'ACTIVE', 'SOS without owner',
+      created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-017 allowed an emergency without a registered owner.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, finalized_at,
+    created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000218',
+    '00000000-0000-0000-0000-000000000202', 'FINALIZED',
+    'Finalized SOS', created_at_value, created_at_value + INTERVAL '1 minute',
+    created_at_value, created_at_value
+  );
+
+  IF to_regclass('emergency.ux_emergencies_open_user') IS NULL
+    OR to_regclass('emergency.ix_emergencies_user_id_started_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-017 did not create the documented emergency indexes.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000201';
+
+  IF EXISTS (
+    SELECT 1
+      FROM emergency.emergencies
+     WHERE emergency_id = '00000000-0000-0000-0000-000000000211'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-017 did not cascade the deleted owner emergency.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000202';
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'emergency.emergencies', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergencies', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergencies', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergencies', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergencies', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-017 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergenciesRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('emergency.emergencies') IS NULL
+  AND to_regclass('emergency.ux_emergencies_open_user') IS NULL
+  AND to_regclass('emergency.ix_emergencies_user_id_started_at') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-017 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1575,7 +1740,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-016)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-017)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -1628,6 +1793,12 @@ try {
   Test-UserDeviceTokensRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-016)' -Command @('update', '--label-filter=hu-db-016')
   Test-UserDeviceTokensAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-017)' -Command @('update', '--label-filter=hu-db-017')
+  Test-EmergenciesAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-017)' -Command @('rollback-count', '--count=3')
+  Test-EmergenciesRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-017)' -Command @('update', '--label-filter=hu-db-017')
+  Test-EmergenciesAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
