@@ -134,3 +134,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/009_grant_user_session_refresh_token_hash_function_execute.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-014-02-grant-user-emergency-settings-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-014,dcl,profile,security"
+      comment: Grants the application only the SOS message personalization lifecycle access.
+      changes:
+        - sqlFile:
+            path: 010_grant_user_emergency_settings_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/010_grant_user_emergency_settings_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

@@ -1084,6 +1084,142 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UserEmergencySettingsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000050', 'settings.user', 'Settings', 'User',
+    'settings.user@example.test', '3000000050', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO profile.user_emergency_settings (
+    setting_id, user_id, default_emergency_message, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000151',
+    '00000000-0000-0000-0000-000000000050', 'Necesito ayuda.',
+    created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO profile.user_emergency_settings (
+      setting_id, user_id, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000152',
+      '00000000-0000-0000-0000-000000000050', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-014 allowed more than one setting for a user.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE profile.user_emergency_settings
+       SET default_emergency_message = '   '
+     WHERE setting_id = '00000000-0000-0000-0000-000000000151';
+    RAISE EXCEPTION 'HU-DB-014 allowed a blank SOS message.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE profile.user_emergency_settings
+       SET default_emergency_message = repeat('x', 501)
+     WHERE setting_id = '00000000-0000-0000-0000-000000000151';
+    RAISE EXCEPTION 'HU-DB-014 allowed an SOS message longer than 500 characters.';
+  EXCEPTION WHEN string_data_right_truncation THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE profile.user_emergency_settings
+       SET updated_at = created_at - INTERVAL '1 second'
+     WHERE setting_id = '00000000-0000-0000-0000-000000000151';
+    RAISE EXCEPTION 'HU-DB-014 allowed updated_at before created_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO profile.user_emergency_settings (
+      setting_id, user_id, default_emergency_message, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000155',
+      '00000000-0000-0000-0000-000000000099', 'Orphan setting',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-014 allowed a setting without a user.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000051', 'settings.cascade', 'Settings', 'Cascade',
+    'settings.cascade@example.test', '3000000051', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO profile.user_emergency_settings (
+    setting_id, user_id, default_emergency_message, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000156',
+    '00000000-0000-0000-0000-000000000051', NULL, created_at_value, created_at_value
+  );
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000051';
+
+  IF EXISTS (
+    SELECT 1
+      FROM profile.user_emergency_settings
+     WHERE setting_id = '00000000-0000-0000-0000-000000000156'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-014 did not delete settings when their user was deleted.';
+  END IF;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'profile.user_emergency_settings', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'profile.user_emergency_settings', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'profile.user_emergency_settings', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'profile.user_emergency_settings', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'profile.user_emergency_settings', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+
+DELETE FROM identity.users
+ WHERE user_id = '00000000-0000-0000-0000-000000000050';
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-014 acceptance verification failed: $result"
+  }
+}
+
+function Test-UserEmergencySettingsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('profile.user_emergency_settings') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-014 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1098,7 +1234,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-013)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-014)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -1113,6 +1249,12 @@ try {
   Test-UsersRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-010)' -Command @('update', '--label-filter=hu-db-010')
   Test-UsersAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-014)' -Command @('update', '--label-filter=hu-db-014')
+  Test-UserEmergencySettingsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-014)' -Command @('rollback-count', '--count=2')
+  Test-UserEmergencySettingsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-014)' -Command @('update', '--label-filter=hu-db-014')
+  Test-UserEmergencySettingsAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-011)' -Command @('update', '--label-filter=hu-db-011')
   Test-UserCredentialsAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-011)' -Command @('rollback-count', '--count=2')
@@ -1132,6 +1274,7 @@ try {
   Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update')
   Test-UserVerificationCodesAcceptance
   Test-UserSessionsAcceptance
+  Test-UserEmergencySettingsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
