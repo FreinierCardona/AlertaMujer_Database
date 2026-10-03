@@ -1,0 +1,1 @@
+DROP INDEX audit.ix_audit_logs_entity_created_at;

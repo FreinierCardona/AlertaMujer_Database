@@ -2666,6 +2666,181 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-AuditLogsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000521', 'audit_actor_521', 'Audit', 'Actor',
+     'audit.actor.521@example.test', '3000000521', 'USER', 'ENABLED',
+     'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000522', 'audit_subject_522', 'Audit', 'Subject',
+     'audit.subject.522@example.test', '3000000522', 'USER', 'ENABLED',
+     'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO audit.audit_logs (
+    audit_log_id, actor_user_id, subject_user_id, action, entity_type, entity_id,
+    result, previous_state, new_state, description, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000531',
+    '00000000-0000-0000-0000-000000000521',
+    '00000000-0000-0000-0000-000000000522',
+    'ACCOUNT_STATUS_CHANGED', 'identity.users',
+    '00000000-0000-0000-0000-000000000522', 'SUCCESS',
+    '{"account_status":"PENDING"}', '{"account_status":"ENABLED"}',
+    'Account status updated', created_at_value
+  );
+
+  INSERT INTO audit.audit_logs (
+    audit_log_id, actor_user_id, action, entity_type, entity_id, result, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000532',
+    '00000000-0000-0000-0000-000000000521', 'ADMIN_LOGIN', 'identity.users',
+    '00000000-0000-0000-0000-000000000521', 'SUCCESS', created_at_value
+  );
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, created_at)
+    VALUES ('UNKNOWN_EVENT', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed an action outside the documented catalog.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, created_at)
+    VALUES ('ADMIN_LOGIN', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'PENDING', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a result outside SUCCESS or FAILED.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, previous_state, created_at)
+    VALUES ('ADMIN_LOGIN', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', '[]', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a non-object previous JSON state.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, new_state, created_at)
+    VALUES ('ADMIN_LOGIN', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', 'null', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a JSON null new state.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, description, created_at)
+    VALUES ('ADMIN_LOGIN', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', repeat('x', 501), created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a description longer than 500 characters.';
+  EXCEPTION WHEN string_data_right_truncation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, description, created_at)
+    VALUES ('ADMIN_LOGIN', 'identity.users', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', '   ', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a blank description.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (action, entity_type, entity_id, result, created_at)
+    VALUES ('ADMIN_LOGIN', '   ', '00000000-0000-0000-0000-000000000522',
+            'SUCCESS', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed a blank logical entity type.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO audit.audit_logs (actor_user_id, action, entity_type, entity_id, result, created_at)
+    VALUES ('00000000-0000-0000-0000-000000000599', 'ADMIN_LOGIN', 'identity.users',
+            '00000000-0000-0000-0000-000000000522', 'FAILED', created_at_value);
+    RAISE EXCEPTION 'HU-DB-023 allowed an unknown audit actor.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  IF to_regclass('audit.ix_audit_logs_entity_created_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-023 did not create the audit target retrieval index.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'audit'
+       AND table_name = 'audit_logs'
+       AND column_name IN ('emergency_id', 'password', 'password_hash', 'fcm_token', 'latitude', 'longitude')
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-023 persisted unsupported SOS history, secrets, tokens, or location data.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000522';
+
+  IF EXISTS (
+    SELECT 1 FROM audit.audit_logs
+     WHERE audit_log_id = '00000000-0000-0000-0000-000000000531'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-023 did not cascade audit events deleted with their subject account.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000521';
+
+  IF EXISTS (
+    SELECT 1 FROM audit.audit_logs
+     WHERE audit_log_id = '00000000-0000-0000-0000-000000000532'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-023 did not cascade audit events deleted with their actor account.';
+  END IF;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'audit.audit_logs', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'audit.audit_logs', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'audit.audit_logs', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'audit.audit_logs', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'audit.audit_logs', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-023 acceptance verification failed: $result"
+  }
+}
+
+function Test-AuditLogsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('audit.audit_logs') IS NULL
+  AND to_regclass('audit.ix_audit_logs_entity_created_at') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-023 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2680,7 +2855,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-022)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-023)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2778,6 +2953,12 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-EmergencyNotificationAttemptsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-022)' -Command @('update', '--label-filter=hu-db-022')
   Test-EmergencyNotificationAttemptsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-023)' -Command @('update', '--label-filter=hu-db-023')
+  Test-AuditLogsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-023)' -Command @('rollback-count', '--count=3')
+  Test-AuditLogsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-023)' -Command @('update', '--label-filter=hu-db-023')
+  Test-AuditLogsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

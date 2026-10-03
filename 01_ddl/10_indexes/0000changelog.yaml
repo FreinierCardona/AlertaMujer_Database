@@ -179,3 +179,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/012_create_emergency_notification_attempts_contact_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-023-02-create-audit-logs-entity-created-index
+      author: FreinierCardona
+      labels: "hu-db-023,ddl,audit,index"
+      comment: Indexes audit-event retrieval for a logical target in event order.
+      changes:
+        - sqlFile:
+            path: 013_create_audit_logs_entity_created_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/013_create_audit_logs_entity_created_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

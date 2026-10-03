@@ -254,3 +254,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/017_grant_emergency_notification_attempts_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-023-03-grant-audit-logs-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-023,dcl,audit,grants"
+      comment: Limits application access to reading and appending audit events.
+      changes:
+        - sqlFile:
+            path: 018_grant_audit_logs_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/018_grant_audit_logs_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
