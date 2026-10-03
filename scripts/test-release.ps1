@@ -1726,6 +1726,201 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyStatusHistoryAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+  current_status_value VARCHAR(11);
+  latest_history_status VARCHAR(11);
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000221', 'history_owner_221', 'History', 'Owner', 'history.owner.221@example.test', '3000000221', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000222', 'history_owner_222', 'History', 'Invalid', 'history.invalid.222@example.test', '3000000222', 'USER', 'ENABLED', 'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000231', '00000000-0000-0000-0000-000000000221', 'ACTIVE', 'History SOS', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000232', '00000000-0000-0000-0000-000000000222', 'ACTIVE', 'Invalid initial history SOS', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO emergency.emergency_status_history (
+    emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+    occurred_at, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000241',
+    '00000000-0000-0000-0000-000000000231', 1, NULL, 'ACTIVE',
+    created_at_value, created_at_value
+  );
+
+  UPDATE emergency.emergencies
+     SET status = 'IN_PROGRESS', updated_at = created_at_value + INTERVAL '1 minute'
+   WHERE emergency_id = '00000000-0000-0000-0000-000000000231';
+
+  INSERT INTO emergency.emergency_status_history (
+    emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+    actor_user_id, cause, occurred_at, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000242',
+    '00000000-0000-0000-0000-000000000231', 2, 'ACTIVE', 'IN_PROGRESS',
+    '00000000-0000-0000-0000-000000000221', 'Administrative attention started',
+    created_at_value + INTERVAL '1 minute', created_at_value + INTERVAL '1 minute'
+  );
+
+  SELECT status
+    INTO current_status_value
+    FROM emergency.emergencies
+   WHERE emergency_id = '00000000-0000-0000-0000-000000000231';
+
+  SELECT new_status
+    INTO latest_history_status
+    FROM emergency.emergency_status_history
+   WHERE emergency_id = '00000000-0000-0000-0000-000000000231'
+   ORDER BY sequence_no DESC
+   LIMIT 1;
+
+  IF current_status_value <> 'IN_PROGRESS'
+    OR latest_history_status <> current_status_value THEN
+    RAISE EXCEPTION 'HU-DB-018 did not support a consistent state and history transaction.';
+  END IF;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000243',
+      '00000000-0000-0000-0000-000000000231', 2, 'ACTIVE', 'IN_PROGRESS',
+      created_at_value + INTERVAL '2 minutes', created_at_value + INTERVAL '2 minutes'
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed a duplicate history sequence for one emergency.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000244',
+      '00000000-0000-0000-0000-000000000232', 1, NULL, 'IN_PROGRESS',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed an invalid initial history record.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000245',
+      '00000000-0000-0000-0000-000000000231', 3, NULL, 'OFFLINE',
+      created_at_value + INTERVAL '2 minutes', created_at_value + INTERVAL '2 minutes'
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed a non-initial history record without a previous status.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000246',
+      '00000000-0000-0000-0000-000000000299', 1, NULL, 'ACTIVE',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed history without an emergency.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      actor_user_id, occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000247',
+      '00000000-0000-0000-0000-000000000231', 3, 'IN_PROGRESS', 'OFFLINE',
+      '00000000-0000-0000-0000-000000000299', created_at_value + INTERVAL '2 minutes', created_at_value + INTERVAL '2 minutes'
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed an unknown history actor.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_status_history (
+      emergency_status_history_id, emergency_id, sequence_no, previous_status, new_status,
+      cause, occurred_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000248',
+      '00000000-0000-0000-0000-000000000231', 3, 'IN_PROGRESS', 'OFFLINE',
+      '   ', created_at_value + INTERVAL '2 minutes', created_at_value + INTERVAL '2 minutes'
+    );
+    RAISE EXCEPTION 'HU-DB-018 allowed a blank history cause.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  IF to_regclass('emergency.ix_emergency_status_history_emergency_occurred_sequence') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-018 did not create the documented history index.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000221';
+
+  IF EXISTS (
+    SELECT 1
+      FROM emergency.emergency_status_history
+     WHERE emergency_id = '00000000-0000-0000-0000-000000000231'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-018 did not cascade deleted emergency history.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000222';
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'emergency.emergency_status_history', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergency_status_history', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_status_history', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_status_history', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_status_history', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-018 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyStatusHistoryRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('emergency.emergency_status_history') IS NULL
+  AND to_regclass('emergency.ix_emergency_status_history_emergency_occurred_sequence') IS NULL
+  AND to_regclass('emergency.emergencies') IS NOT NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-018 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -1740,7 +1935,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-017)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-018)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -1799,6 +1994,12 @@ try {
   Test-EmergenciesRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-017)' -Command @('update', '--label-filter=hu-db-017')
   Test-EmergenciesAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-018)' -Command @('update', '--label-filter=hu-db-018')
+  Test-EmergencyStatusHistoryAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-018)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyStatusHistoryRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-018)' -Command @('update', '--label-filter=hu-db-018')
+  Test-EmergencyStatusHistoryAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
