@@ -1,0 +1,35 @@
+name: Database release validation
+
+on:
+  pull_request:
+    paths:
+      - '**'
+  push:
+    branches:
+      - main
+      - qa
+      - develop
+      - 'feat/**'
+    paths:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  liquibase-release:
+    name: Liquibase release cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Docker Compose version
+        run: docker compose version
+
+      - name: Validate isolated Liquibase release cycle
+        shell: pwsh
+        run: ./scripts/test-release.ps1 -ReleaseTag alertamujer-db-v0.12.0

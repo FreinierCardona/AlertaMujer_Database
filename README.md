@@ -1,6 +1,6 @@
 # AlertaMujer Database
 
-Repositorio de PostgreSQL y Liquibase de AlertaMujer. Centraliza la infraestructura local y el versionamiento ordenado de futuros cambios de base de datos; no contiene datos reales ni changesets de negocio iniciales.
+Repositorio de PostgreSQL y Liquibase de AlertaMujer. Centraliza la infraestructura local y el versionamiento de los changesets entregados para las HUs de base de datos; no contiene datos reales.
 
 ## Estructura del repositorio
 
@@ -49,6 +49,8 @@ Los changelogs internos son el lugar exclusivo para registrar changesets, respet
 En `identity.registration_requests`, `alertamujer_app` inserta y actualiza el flujo temporal, pero su `SELECT` es por columnas y excluye `password_hash`.
 
 En `identity.users`, `alertamujer_app` tiene `SELECT`, `INSERT` y `UPDATE` para el ciclo de vida de cuentas; no recibe `DELETE`, `TRUNCATE` ni permisos de administración.
+
+Las tablas de credenciales, solicitudes de registro y OTP no exponen hashes mediante `SELECT` al rol de aplicación. Para las verificaciones de autenticación de las HUs implementadas, `alertamujer_app` solo puede ejecutar `identity.get_user_password_hash(uuid)`, `identity.get_registration_password_hash(uuid)` e `identity.get_verification_code_hash(uuid)`. Cada función recibe un identificador y devuelve exclusivamente el hash asociado; el backend conserva la autorización del flujo y la comparación segura.
 
 Las contraseñas no se versionan. `POSTGRES_USER`/`POSTGRES_PASSWORD`, `APP_DB_USER`/`APP_DB_PASSWORD` y `MIGRATOR_DB_USER`/`MIGRATOR_DB_PASSWORD` se leen de `.env`. Los nombres de aplicación y migración están fijados como `alertamujer_app` y `alertamujer_migrator`; el script rechaza otros nombres. En un volumen existente, cambiar una contraseña en `.env` requiere ejecutar `./scripts/reconcile-technical-roles.ps1` para aplicarla en PostgreSQL; editar `.env` por sí solo no rota credenciales ya persistidas.
 
@@ -118,10 +120,10 @@ Para reiniciar deliberadamente la base local, use `docker compose down --volumes
 Antes de integrar una release, ejecute el ciclo completo en una base efímera:
 
 ```powershell
-.\scripts\test-release.ps1 -ReleaseTag alertamujer-db-v0.7.0
+.\scripts\test-release.ps1 -ReleaseTag alertamujer-db-v0.12.0
 ```
 
-El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, la verificación de aceptación de `system_configuration`, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
+El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, las verificaciones de aceptación de las HUs implementadas, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El mismo ciclo se ejecuta automáticamente en GitHub Actions ante pull requests y pushes que afecten la base de datos. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
 
 Los changesets ya aplicados son inmutables: una corrección se entrega en un changeset nuevo. Para cambios incompatibles, planifique expandir, migrar y contraer en releases separadas; el tag debe respetar el formato `alertamujer-db-vX.Y.Z`.
 
