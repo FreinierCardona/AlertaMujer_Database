@@ -46,6 +46,7 @@ Los changelogs internos son el lugar exclusivo para registrar changesets, respet
 | `alertamujer_migrator` | Liquibase. | Inicia sesión, pertenece a `alertamujer_owner` y opera como owner al ejecutar migrations. Puede administrar roles técnicos, pero no es superusuario ni puede crear bases. |
 | `alertamujer_app` | Backend de AlertaMujer. | Puede conectarse y usar los schemas funcionales. Los objetos futuros reciben solo el DML mínimo: lectura en `configuration`; lectura/inserción/actualización en `identity`, `profile`, `contacts` y `notification`; lectura/inserción en `emergency` y `audit`. No recibe DDL, `TRUNCATE` ni privilegios predeterminados de `DELETE`. |
 
+En `identity.registration_requests`, `alertamujer_app` inserta y actualiza el flujo temporal, pero su `SELECT` es por columnas y excluye `password_hash`.
 
 Las contraseñas no se versionan. `POSTGRES_USER`/`POSTGRES_PASSWORD`, `APP_DB_USER`/`APP_DB_PASSWORD` y `MIGRATOR_DB_USER`/`MIGRATOR_DB_PASSWORD` se leen de `.env`. Los nombres de aplicación y migración están fijados como `alertamujer_app` y `alertamujer_migrator`; el script rechaza otros nombres. En un volumen existente, cambiar una contraseña en `.env` requiere ejecutar `./scripts/reconcile-technical-roles.ps1` para aplicarla en PostgreSQL; editar `.env` por sí solo no rota credenciales ya persistidas.
 

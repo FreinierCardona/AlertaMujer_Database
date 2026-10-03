@@ -1,0 +1,3 @@
+DROP INDEX identity.ux_registration_requests_pending_phone;
+DROP INDEX identity.ux_registration_requests_pending_email;
+DROP INDEX identity.ux_registration_requests_pending_username;
