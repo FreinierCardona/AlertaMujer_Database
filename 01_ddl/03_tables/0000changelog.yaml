@@ -44,3 +44,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/003_create_users_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-011-01-create-user-credentials-table
+      author: FreinierCardona
+      labels: "hu-db-011,ddl,identity,table"
+      comment: Creates the isolated permanent password credential for each account.
+      changes:
+        - sqlFile:
+            path: 004_create_user_credentials_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/004_create_user_credentials_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
