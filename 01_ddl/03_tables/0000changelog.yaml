@@ -224,3 +224,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/015_create_emergency_notification_attempts_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-023-01-create-audit-logs-table
+      author: FreinierCardona
+      labels: "hu-db-023,ddl,audit,table"
+      comment: Creates immutable administrative and security audit events with account deletion cleanup.
+      changes:
+        - sqlFile:
+            path: 016_create_audit_logs_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/016_create_audit_logs_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
