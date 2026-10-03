@@ -1,0 +1,1 @@
+DROP INDEX notification.ix_emergency_notification_attempts_contact_attempted_at;
