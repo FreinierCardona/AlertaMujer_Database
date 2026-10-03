@@ -164,3 +164,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/011_create_emergency_chat_messages_order_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-022-02-create-emergency-notification-attempts-contact-index
+      author: FreinierCardona
+      labels: "hu-db-022,ddl,notification,index"
+      comment: Indexes notification-attempt retrieval for each contacted account.
+      changes:
+        - sqlFile:
+            path: 012_create_emergency_notification_attempts_contact_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/012_create_emergency_notification_attempts_contact_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

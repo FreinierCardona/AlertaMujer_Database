@@ -2437,6 +2437,235 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyNotificationAttemptsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000421', 'attempt_owner_421', 'Attempt', 'Owner',
+     'attempt.owner.421@example.test', '3000000421', 'USER', 'ENABLED',
+     'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000422', 'attempt_contact_422', 'Attempt', 'Contact',
+     'attempt.contact.422@example.test', '3000000422', 'USER', 'ENABLED',
+     'SELF_REGISTERED', created_at_value, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000423', 'attempt_no_token_423', 'NoToken', 'Contact',
+     'attempt.no.token.423@example.test', '3000000423', 'USER', 'ENABLED',
+     'SELF_REGISTERED', created_at_value, created_at_value, created_at_value);
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000431', '00000000-0000-0000-0000-000000000421',
+    'ACTIVE', 'Notification attempt SOS', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO notification.user_device_tokens (
+    device_token_id, user_id, fcm_token, platform, is_active, created_at, updated_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000441', '00000000-0000-0000-0000-000000000422',
+     'fcm-token-contact-422', 'ANDROID', TRUE, created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000442', '00000000-0000-0000-0000-000000000421',
+     'fcm-token-owner-421', 'ANDROID', TRUE, created_at_value, created_at_value);
+
+  INSERT INTO notification.emergency_notification_attempts (
+    notification_attempt_id, emergency_id, contact_user_id, device_token_id,
+    result_status, attempted_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000451', '00000000-0000-0000-0000-000000000431',
+    '00000000-0000-0000-0000-000000000422', '00000000-0000-0000-0000-000000000441',
+    'PENDING', created_at_value, created_at_value
+  );
+
+  UPDATE notification.emergency_notification_attempts
+     SET result_status = 'SENT_TO_FCM',
+         provider_message_id = 'projects/example/messages/451',
+         updated_at = created_at_value + INTERVAL '1 minute'
+   WHERE notification_attempt_id = '00000000-0000-0000-0000-000000000451';
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, result_status,
+      attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000452', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000423', 'NO_TOKEN',
+      created_at_value + INTERVAL '1 minute', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed updated_at before attempted_at.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO notification.emergency_notification_attempts (
+    notification_attempt_id, emergency_id, contact_user_id, result_status,
+    error_code, attempted_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000452', '00000000-0000-0000-0000-000000000431',
+    '00000000-0000-0000-0000-000000000423', 'NO_TOKEN', 'NO_ELIGIBLE_TOKEN',
+    created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, device_token_id,
+      result_status, attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000453', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000422', '00000000-0000-0000-0000-000000000441',
+      'PENDING', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed more than one attempt per emergency/contact.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, device_token_id,
+      result_status, attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000454', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000421', '00000000-0000-0000-0000-000000000441',
+      'PENDING', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed a token owned by another contact.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, result_status,
+      attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000455', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000423', 'SENT_TO_FCM',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed an FCM send result without a token.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, device_token_id,
+      result_status, attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000456', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000423', '00000000-0000-0000-0000-000000000441',
+      'NO_TOKEN', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed NO_TOKEN with a device token.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, device_token_id,
+      result_status, attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000457', '00000000-0000-0000-0000-000000000431',
+      '00000000-0000-0000-0000-000000000423', '00000000-0000-0000-0000-000000000441',
+      'DELIVERED', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed a result outside the documented FCM states.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO notification.emergency_notification_attempts (
+      notification_attempt_id, emergency_id, contact_user_id, result_status,
+      attempted_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000458', '00000000-0000-0000-0000-000000000499',
+      '00000000-0000-0000-0000-000000000423', 'NO_TOKEN',
+      created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-022 allowed an unknown emergency.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  IF to_regclass('notification.ix_emergency_notification_attempts_contact_attempted_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-022 did not create the documented contact retrieval index.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'notification'
+       AND table_name = 'emergency_notification_attempts'
+       AND column_name IN ('delivered_at', 'read_at', 'delivery_status')
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-022 persisted an unsupported delivery or read assertion.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000422';
+
+  IF EXISTS (
+    SELECT 1
+      FROM notification.emergency_notification_attempts
+     WHERE notification_attempt_id = '00000000-0000-0000-0000-000000000451'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-022 did not cascade deleted contact notification attempts.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000421';
+
+  IF EXISTS (
+    SELECT 1
+      FROM notification.emergency_notification_attempts
+     WHERE notification_attempt_id = '00000000-0000-0000-0000-000000000452'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-022 did not cascade notification attempts deleted with their emergency.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000423';
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-022 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyNotificationAttemptsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('notification.emergency_notification_attempts') IS NULL
+  AND to_regclass('notification.ix_emergency_notification_attempts_contact_attempted_at') IS NULL
+  AND to_regclass('notification.user_device_tokens') IS NOT NULL
+  AND to_regclass('emergency.emergencies') IS NOT NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-022 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2451,7 +2680,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-021)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-022)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2543,6 +2772,12 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-EmergencyChatMessagesRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-021)' -Command @('update', '--label-filter=hu-db-021')
   Test-EmergencyChatMessagesAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-022)' -Command @('update', '--label-filter=hu-db-022')
+  Test-EmergencyNotificationAttemptsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-022)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyNotificationAttemptsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-022)' -Command @('update', '--label-filter=hu-db-022')
+  Test-EmergencyNotificationAttemptsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

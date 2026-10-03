@@ -1,0 +1,1 @@
+DROP TABLE notification.emergency_notification_attempts;
