@@ -164,3 +164,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/011_create_emergency_status_history_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-019-01-create-emergency-locations-table
+      author: FreinierCardona
+      labels: "hu-db-019,ddl,emergency,table"
+      comment: Creates confirmed emergency location points with geographic integrity.
+      changes:
+        - sqlFile:
+            path: 012_create_emergency_locations_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/012_create_emergency_locations_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

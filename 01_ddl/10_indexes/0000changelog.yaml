@@ -119,3 +119,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/008_create_emergency_status_history_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-019-02-create-emergency-locations-latest-index
+      author: FreinierCardona
+      labels: "hu-db-019,ddl,emergency,index"
+      comment: Indexes confirmed emergency locations for latest-position queries.
+      changes:
+        - sqlFile:
+            path: 009_create_emergency_locations_latest_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/009_create_emergency_locations_latest_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

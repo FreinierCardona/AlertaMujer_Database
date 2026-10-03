@@ -209,3 +209,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/014_grant_emergency_status_history_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-019-03-grant-emergency-locations-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-019,dcl,emergency,security"
+      comment: Grants confirmed emergency location reads and inserts to the application role.
+      changes:
+        - sqlFile:
+            path: 015_grant_emergency_locations_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/015_grant_emergency_locations_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
