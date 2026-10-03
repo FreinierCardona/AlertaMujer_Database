@@ -2250,6 +2250,193 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyChatMessagesAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+  ordered_contents TEXT[];
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000321', 'chat_owner_321', 'Chat', 'Owner',
+    'chat.owner.321@example.test', '3000000321', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000331', '00000000-0000-0000-0000-000000000321',
+    'ACTIVE', 'Chat SOS', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergency_chat_messages (
+    client_message_id, emergency_id, sender_user_id, content, sent_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000341', '00000000-0000-0000-0000-000000000331',
+     '00000000-0000-0000-0000-000000000321', 'first', created_at_value),
+    ('00000000-0000-0000-0000-000000000342', '00000000-0000-0000-0000-000000000331',
+     '00000000-0000-0000-0000-000000000321', 'latest-a', created_at_value + INTERVAL '1 minute'),
+    ('00000000-0000-0000-0000-000000000343', '00000000-0000-0000-0000-000000000331',
+     '00000000-0000-0000-0000-000000000321', 'latest-b', created_at_value + INTERVAL '1 minute');
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, sender_user_id, content, sent_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000341', '00000000-0000-0000-0000-000000000331',
+      '00000000-0000-0000-0000-000000000321', 'duplicate retry', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed a duplicate client message identifier for one emergency.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, sender_user_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000344', '00000000-0000-0000-0000-000000000331',
+      '00000000-0000-0000-0000-000000000321', '   '
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed blank chat content.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, sender_user_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000345', '00000000-0000-0000-0000-000000000331',
+      '00000000-0000-0000-0000-000000000321', repeat('x', 501)
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed chat content above 500 characters.';
+  EXCEPTION WHEN string_data_right_truncation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, sender_user_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000346', '00000000-0000-0000-0000-000000000321', 'no emergency'
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed a message without an emergency.';
+  EXCEPTION WHEN not_null_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000347', '00000000-0000-0000-0000-000000000331', 'no sender'
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed a message without a sender.';
+  EXCEPTION WHEN not_null_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, sender_user_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000348', '00000000-0000-0000-0000-000000000399',
+      '00000000-0000-0000-0000-000000000321', 'unknown emergency'
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed an unknown emergency.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_chat_messages (
+      client_message_id, emergency_id, sender_user_id, content
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000349', '00000000-0000-0000-0000-000000000331',
+      '00000000-0000-0000-0000-000000000399', 'unknown sender'
+    );
+    RAISE EXCEPTION 'HU-DB-021 allowed an unknown sender.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  IF (SELECT count(*) FROM emergency.emergency_chat_messages
+      WHERE emergency_id = '00000000-0000-0000-0000-000000000331'
+        AND client_message_id = '00000000-0000-0000-0000-000000000341') <> 1 THEN
+    RAISE EXCEPTION 'HU-DB-021 did not preserve one message per emergency/client identifier.';
+  END IF;
+
+  SELECT array_agg(content ORDER BY sent_at DESC, chat_message_id DESC)
+    INTO ordered_contents
+    FROM emergency.emergency_chat_messages
+   WHERE emergency_id = '00000000-0000-0000-0000-000000000331';
+
+  IF ordered_contents <> ARRAY['latest-b', 'latest-a', 'first'] THEN
+    RAISE EXCEPTION 'HU-DB-021 did not preserve the documented sent-at and stable-id order.';
+  END IF;
+
+  IF to_regclass('emergency.ix_emergency_chat_messages_emergency_sent_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-021 did not create the documented chat retrieval index.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'emergency'
+       AND table_name = 'emergency_chat_messages'
+       AND column_name IN ('sender_role_snapshot', 'sender_role', 'status')
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-021 persisted a sender role or visual-state snapshot.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000321';
+
+  IF EXISTS (
+    SELECT 1
+      FROM emergency.emergency_chat_messages
+     WHERE emergency_id = '00000000-0000-0000-0000-000000000331'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-021 did not cascade deleted emergency chat messages.';
+  END IF;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'emergency.emergency_chat_messages', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergency_chat_messages', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_chat_messages', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_chat_messages', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_chat_messages', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-021 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyChatMessagesRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('emergency.emergency_chat_messages') IS NULL
+  AND to_regclass('emergency.ix_emergency_chat_messages_emergency_sent_at') IS NULL
+  AND to_regclass('emergency.emergencies') IS NOT NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-021 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2264,7 +2451,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-020)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-021)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2350,6 +2537,12 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-EmergencyEvidencesRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-020)' -Command @('update', '--label-filter=hu-db-020')
   Test-EmergencyEvidencesAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-021)' -Command @('update', '--label-filter=hu-db-021')
+  Test-EmergencyChatMessagesAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-021)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyChatMessagesRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-021)' -Command @('update', '--label-filter=hu-db-021')
+  Test-EmergencyChatMessagesAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

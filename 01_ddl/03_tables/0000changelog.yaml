@@ -194,3 +194,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/013_create_emergency_evidences_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-021-01-create-emergency-chat-messages-table
+      author: FreinierCardona
+      labels: "hu-db-021,ddl,emergency,table"
+      comment: Creates idempotent emergency chat messages with stable server-side ordering.
+      changes:
+        - sqlFile:
+            path: 014_create_emergency_chat_messages_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/014_create_emergency_chat_messages_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

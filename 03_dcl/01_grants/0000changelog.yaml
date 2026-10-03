@@ -224,3 +224,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/015_grant_emergency_evidences_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-021-03-grant-emergency-chat-messages-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-021,dcl,emergency,security"
+      comment: Grants the application emergency chat reads and inserts only.
+      changes:
+        - sqlFile:
+            path: 016_grant_emergency_chat_messages_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/016_grant_emergency_chat_messages_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
