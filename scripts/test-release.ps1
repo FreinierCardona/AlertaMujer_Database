@@ -492,6 +492,160 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UserCredentialsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-02 00:00:00+00';
+BEGIN
+  INSERT INTO identity.user_credentials (
+    credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000111',
+    '00000000-0000-0000-0000-000000000010',
+    '$2b$12$user-credential-hash', created_at_value, created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_credentials (
+      credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000112',
+      '00000000-0000-0000-0000-000000000010',
+      '$2b$12$duplicate-user-credential-hash', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-011 allowed more than one credential for a user.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_credentials (
+      credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000113',
+      '00000000-0000-0000-0000-000000000999',
+      '$2b$12$orphan-credential-hash', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-011 allowed an orphan credential.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000020', 'credential.blank', 'Credential', 'Blank',
+    'credential.blank@example.test', '3000000020', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_credentials (
+      credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000114',
+      '00000000-0000-0000-0000-000000000020',
+      '   ', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-011 allowed a blank password hash.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000021', 'credential.long', 'Credential', 'Long',
+    'credential.long@example.test', '3000000021', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_credentials (
+      credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000115',
+      '00000000-0000-0000-0000-000000000021',
+      repeat('x', 256), created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-011 allowed a password hash longer than 255 characters.';
+  EXCEPTION WHEN string_data_right_truncation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000022', 'credential.cascade', 'Credential', 'Cascade',
+    'credential.cascade@example.test', '3000000022', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_credentials (
+    credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000116',
+    '00000000-0000-0000-0000-000000000022',
+    '$2b$12$cascade-credential-hash', created_at_value, created_at_value, created_at_value
+  );
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000022';
+
+  IF EXISTS (
+    SELECT 1
+      FROM identity.user_credentials
+     WHERE credential_id = '00000000-0000-0000-0000-000000000116'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-011 did not delete the credential when its user was deleted.';
+  END IF;
+
+  DELETE FROM identity.user_credentials
+   WHERE credential_id = '00000000-0000-0000-0000-000000000111';
+
+  DELETE FROM identity.users
+   WHERE user_id IN (
+     '00000000-0000-0000-0000-000000000020',
+     '00000000-0000-0000-0000-000000000021'
+   );
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.user_credentials', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'identity.user_credentials', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_credentials', 'SELECT')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_credentials', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_credentials', 'TRUNCATE')
+  AND has_column_privilege('alertamujer_app', 'identity.user_credentials', 'credential_id', 'SELECT')
+  AND NOT has_column_privilege('alertamujer_app', 'identity.user_credentials', 'password_hash', 'SELECT')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-011 acceptance verification failed: $result"
+  }
+}
+
+function Test-UserCredentialsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.user_credentials') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-011 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -506,7 +660,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 and HU-DB-010)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-011)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -519,8 +673,14 @@ try {
   Test-UsersAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-010)' -Command @('rollback-count', '--count=3')
   Test-UsersRollback
-  Invoke-Liquibase -Phase 'update (restore HU-DB-010)' -Command @('update')
+  Invoke-Liquibase -Phase 'update (restore HU-DB-010)' -Command @('update', '--label-filter=hu-db-010')
   Test-UsersAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-011)' -Command @('update', '--label-filter=hu-db-011')
+  Test-UserCredentialsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-011)' -Command @('rollback-count', '--count=2')
+  Test-UserCredentialsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-011)' -Command @('update')
+  Test-UserCredentialsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
