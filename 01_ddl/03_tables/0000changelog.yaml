@@ -59,3 +59,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/004_create_user_credentials_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-012-01-create-user-verification-codes-table
+      author: FreinierCardona
+      labels: "hu-db-012,ddl,identity,table"
+      comment: Creates protected OTP persistence bound to exactly one identity context.
+      changes:
+        - sqlFile:
+            path: 005_create_user_verification_codes_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/005_create_user_verification_codes_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

@@ -646,6 +646,251 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UserVerificationCodesAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-02 00:00:00+00';
+BEGIN
+  INSERT INTO identity.user_credentials (
+    credential_id, user_id, password_hash, password_updated_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000131',
+    '00000000-0000-0000-0000-000000000010',
+    '$2b$12$user-credential-hash', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_verification_codes (
+    verification_code_id, user_id, channel, purpose, destination_snapshot,
+    code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000121',
+    '00000000-0000-0000-0000-000000000010', 'EMAIL', 'PASSWORD_RESET',
+    'alerta.user@example.test', '$2b$12$user-otp-hash',
+    created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_verification_codes (
+    verification_code_id, registration_request_id, channel, purpose, destination_snapshot,
+    code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000122',
+    '00000000-0000-0000-0000-000000000009', 'SMS', 'PHONE_VERIFICATION',
+    '3000000000', '$2b$12$registration-otp-hash',
+    created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, channel, purpose, destination_snapshot, code_hash,
+      expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000123', 'EMAIL', 'EMAIL_VERIFICATION',
+      'orphan@example.test', '$2b$12$orphan-otp-hash',
+      created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed an OTP without an identity context.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, user_id, registration_request_id, channel, purpose,
+      destination_snapshot, code_hash, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000124',
+      '00000000-0000-0000-0000-000000000010',
+      '00000000-0000-0000-0000-000000000009', 'EMAIL', 'EMAIL_VERIFICATION',
+      'both@example.test', '$2b$12$both-contexts-otp-hash',
+      created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed an OTP in both identity contexts.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, user_id, channel, purpose, destination_snapshot,
+      code_hash, expires_at, attempt_count, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000125',
+      '00000000-0000-0000-0000-000000000010', 'EMAIL', 'PASSWORD_RESET',
+      'attempts@example.test', '$2b$12$attempts-otp-hash',
+      created_at_value + INTERVAL '3 hours', 6, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed attempt_count above the documented maximum.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, user_id, channel, purpose, destination_snapshot,
+      code_hash, expires_at, resend_number, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000126',
+      '00000000-0000-0000-0000-000000000010', 'EMAIL', 'PASSWORD_RESET',
+      'resends@example.test', '$2b$12$resends-otp-hash',
+      created_at_value + INTERVAL '3 hours', 4, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed resend_number above the documented maximum.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, user_id, channel, purpose, destination_snapshot,
+      code_hash, expires_at, max_attempts, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000127',
+      '00000000-0000-0000-0000-000000000010', 'EMAIL', 'PASSWORD_RESET',
+      'maximum@example.test', '$2b$12$maximum-otp-hash',
+      created_at_value + INTERVAL '3 hours', 4, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed a max_attempts value other than five.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      verification_code_id, user_id, channel, purpose, destination_snapshot,
+      code_hash, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000128',
+      '00000000-0000-0000-0000-000000000010', 'EMAIL', 'PASSWORD_RESET',
+      'expired@example.test', '$2b$12$expired-otp-hash',
+      created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-012 allowed an expiration that does not follow creation.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000030', 'otp.cascade.user', 'Otp', 'Cascade',
+    'otp.cascade.user@example.test', '3000000030', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_verification_codes (
+    verification_code_id, user_id, channel, purpose, destination_snapshot,
+    code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000129',
+    '00000000-0000-0000-0000-000000000030', 'EMAIL', 'PROFILE_CONTACT_CHANGE',
+    'otp.cascade.user@example.test', '$2b$12$user-cascade-otp-hash',
+    created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+  );
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000030';
+
+  IF EXISTS (
+    SELECT 1 FROM identity.user_verification_codes
+     WHERE verification_code_id = '00000000-0000-0000-0000-000000000129'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-012 did not delete OTPs when their user context was deleted.';
+  END IF;
+
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email, phone,
+    password_hash, status, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000017', 'otp.cascade.request', 'Otp', 'Request',
+    'otp.cascade.request@example.test', '3000000031', '$2b$12$otp-request-hash',
+    'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_verification_codes (
+    verification_code_id, registration_request_id, channel, purpose, destination_snapshot,
+    code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000130',
+    '00000000-0000-0000-0000-000000000017', 'SMS', 'PHONE_VERIFICATION',
+    '3000000031', '$2b$12$request-cascade-otp-hash',
+    created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+  );
+
+  DELETE FROM identity.registration_requests
+   WHERE registration_request_id = '00000000-0000-0000-0000-000000000017';
+
+  IF EXISTS (
+    SELECT 1 FROM identity.user_verification_codes
+     WHERE verification_code_id = '00000000-0000-0000-0000-000000000130'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-012 did not delete OTPs when their registration context was deleted.';
+  END IF;
+
+END
+$$;
+
+SET ROLE alertamujer_app;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'SELECT')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'TRUNCATE')
+  AND has_column_privilege('alertamujer_app', 'identity.user_verification_codes', 'verification_code_id', 'SELECT')
+  AND NOT has_column_privilege('alertamujer_app', 'identity.user_verification_codes', 'code_hash', 'SELECT')
+  AND has_function_privilege('alertamujer_app', 'identity.get_user_password_hash(uuid)', 'EXECUTE')
+  AND has_function_privilege('alertamujer_app', 'identity.get_registration_password_hash(uuid)', 'EXECUTE')
+  AND has_function_privilege('alertamujer_app', 'identity.get_verification_code_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_user_password_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_registration_password_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_verification_code_hash(uuid)', 'EXECUTE')
+  AND identity.get_user_password_hash('00000000-0000-0000-0000-000000000010') = '$2b$12$user-credential-hash'
+  AND identity.get_registration_password_hash('00000000-0000-0000-0000-000000000009') = '$2b$12$pending-request-hash'
+  AND identity.get_verification_code_hash('00000000-0000-0000-0000-000000000121') = '$2b$12$user-otp-hash'
+THEN 'OK' ELSE 'FAILED' END;
+
+RESET ROLE;
+
+DELETE FROM identity.user_verification_codes
+ WHERE verification_code_id IN (
+   '00000000-0000-0000-0000-000000000121',
+   '00000000-0000-0000-0000-000000000122'
+ );
+
+DELETE FROM identity.user_credentials
+ WHERE credential_id = '00000000-0000-0000-0000-000000000131';
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-012 acceptance verification failed: $result"
+  }
+}
+
+function Test-UserVerificationCodesRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.user_verification_codes') IS NULL
+  AND to_regclass('identity.ix_user_verification_codes_user_id') IS NULL
+  AND to_regclass('identity.ix_user_verification_codes_registration_request_id') IS NULL
+  AND to_regclass('identity.ix_user_verification_codes_expires_at') IS NULL
+  AND to_regprocedure('identity.get_user_password_hash(uuid)') IS NULL
+  AND to_regprocedure('identity.get_registration_password_hash(uuid)') IS NULL
+  AND to_regprocedure('identity.get_verification_code_hash(uuid)') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND to_regclass('identity.registration_requests') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-012 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -660,7 +905,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-011)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-012)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -679,8 +924,14 @@ try {
   Test-UserCredentialsAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-011)' -Command @('rollback-count', '--count=2')
   Test-UserCredentialsRollback
-  Invoke-Liquibase -Phase 'update (restore HU-DB-011)' -Command @('update')
+  Invoke-Liquibase -Phase 'update (restore HU-DB-011)' -Command @('update', '--label-filter=hu-db-011')
   Test-UserCredentialsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-012)' -Command @('update', '--label-filter=hu-db-012')
+  Test-UserVerificationCodesAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-012)' -Command @('rollback-count', '--count=5')
+  Test-UserVerificationCodesRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update')
+  Test-UserVerificationCodesAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
