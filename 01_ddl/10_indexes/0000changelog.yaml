@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/001_create_registration_requests_pending_identity_indexes.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-010-02-create-users-single-entity-admin-index
+      author: FreinierCardona
+      labels: "hu-db-010,ddl,identity,index"
+      comment: Enforces the single ENTITY_ADMIN account permitted by the model.
+      changes:
+        - sqlFile:
+            path: 002_create_users_single_entity_admin_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/002_create_users_single_entity_admin_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

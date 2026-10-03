@@ -29,3 +29,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/002_create_registration_requests_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-010-01-create-users-table
+      author: FreinierCardona
+      labels: "hu-db-010,ddl,identity,table"
+      comment: Creates the canonical account identity with documented role and lifecycle integrity.
+      changes:
+        - sqlFile:
+            path: 003_create_users_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/003_create_users_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
