@@ -209,3 +209,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/014_create_emergency_chat_messages_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-022-01-create-emergency-notification-attempts-table
+      author: FreinierCardona
+      labels: "hu-db-022,ddl,notification,table"
+      comment: Creates one traceable FCM attempt per emergency and eligible contact.
+      changes:
+        - sqlFile:
+            path: 015_create_emergency_notification_attempts_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/015_create_emergency_notification_attempts_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
