@@ -134,3 +134,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/009_create_emergency_locations_latest_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-020-02-create-emergency-evidences-received-index
+      author: FreinierCardona
+      labels: "hu-db-020,ddl,emergency,index"
+      comment: Indexes emergency evidence retrieval in confirmed receipt order.
+      changes:
+        - sqlFile:
+            path: 010_create_emergency_evidences_received_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/010_create_emergency_evidences_received_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

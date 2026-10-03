@@ -880,6 +880,7 @@ SELECT CASE WHEN
   AND to_regprocedure('identity.get_user_password_hash(uuid)') IS NULL
   AND to_regprocedure('identity.get_registration_password_hash(uuid)') IS NULL
   AND to_regprocedure('identity.get_verification_code_hash(uuid)') IS NULL
+  AND to_regprocedure('identity.get_user_session_refresh_token_hash(uuid)') IS NULL
   AND to_regclass('identity.users') IS NOT NULL
   AND to_regclass('identity.registration_requests') IS NOT NULL
   AND (SELECT count(*) FROM configuration.system_configuration) = 1
@@ -1042,9 +1043,6 @@ SELECT CASE WHEN
   AND NOT has_table_privilege('alertamujer_app', 'identity.user_sessions', 'TRUNCATE')
   AND has_column_privilege('alertamujer_app', 'identity.user_sessions', 'session_id', 'SELECT')
   AND NOT has_column_privilege('alertamujer_app', 'identity.user_sessions', 'refresh_token_hash', 'SELECT')
-  AND has_function_privilege('alertamujer_app', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
-  AND NOT has_function_privilege('public', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
-  AND identity.get_user_session_refresh_token_hash('00000000-0000-0000-0000-000000000141') = '$2b$12$mobile-refresh-token-hash'
   AND NOT EXISTS (
     SELECT 1
       FROM information_schema.columns
@@ -1072,7 +1070,6 @@ SELECT CASE WHEN
   to_regclass('identity.user_sessions') IS NULL
   AND to_regclass('identity.ix_user_sessions_user_id') IS NULL
   AND to_regclass('identity.ix_user_sessions_expires_at') IS NULL
-  AND to_regprocedure('identity.get_user_session_refresh_token_hash(uuid)') IS NULL
   AND to_regclass('identity.users') IS NOT NULL
   AND to_regclass('identity.user_credentials') IS NOT NULL
   AND (SELECT count(*) FROM configuration.system_configuration) = 1
@@ -2046,6 +2043,213 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-EmergencyEvidencesAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000281', 'evidence_owner_281', 'Evidence', 'Owner',
+    'evidence.owner.281@example.test', '3000000281', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergencies (
+    emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000291', '00000000-0000-0000-0000-000000000281',
+    'ACTIVE', 'Evidence SOS', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO emergency.emergency_evidences (
+    evidence_id, emergency_id, evidence_sequence, file_reference, original_file_name,
+    mime_type, original_mime_type, file_size_bytes, captured_at, received_at
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000291',
+     1, 'evidence-301', 'capture-301.jpg', 'image/webp', 'image/jpeg', 1048576,
+     created_at_value, created_at_value),
+    ('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000291',
+     10, 'evidence-302', NULL, 'image/webp', NULL, 1,
+     NULL, created_at_value + INTERVAL '1 minute');
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000303', '00000000-0000-0000-0000-000000000291',
+      1, 'evidence-303', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed duplicate evidence sequence for one emergency.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000304', '00000000-0000-0000-0000-000000000291',
+      2, 'evidence-301', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed a reused internal file reference.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000305', '00000000-0000-0000-0000-000000000291',
+      0, 'evidence-305', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed an evidence sequence below the documented range.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000306', '00000000-0000-0000-0000-000000000291',
+      11, 'evidence-306', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed an evidence sequence above the documented range.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000307', '00000000-0000-0000-0000-000000000291',
+      2, 'evidence-307', 'image/jpeg', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed a final MIME type other than image/webp.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000308', '00000000-0000-0000-0000-000000000291',
+      2, 'evidence-308', 'image/webp', 0, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed an empty final evidence file.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000309', '00000000-0000-0000-0000-000000000291',
+      2, 'evidence-309', 'image/webp', 1048577, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed a final evidence file above the documented size.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000310', '00000000-0000-0000-0000-000000000291',
+      2, '   ', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed a blank internal file reference.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000311', '00000000-0000-0000-0000-000000000399',
+      1, 'evidence-311', 'image/webp', 10, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-020 allowed evidence without an emergency.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  IF to_regclass('emergency.ix_emergency_evidences_emergency_received_at') IS NULL THEN
+    RAISE EXCEPTION 'HU-DB-020 did not create the documented evidence receipt index.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'emergency'
+       AND table_name = 'emergency_evidences'
+       AND (column_name = 'user_id' OR data_type = 'bytea')
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-020 persisted a redundant owner or binary evidence data.';
+  END IF;
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000281';
+
+  IF EXISTS (
+    SELECT 1
+      FROM emergency.emergency_evidences
+     WHERE emergency_id = '00000000-0000-0000-0000-000000000291'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-020 did not cascade deleted emergency evidence metadata.';
+  END IF;
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'SELECT')
+  AND has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'INSERT')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'TRUNCATE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-020 acceptance verification failed: $result"
+  }
+}
+
+function Test-EmergencyEvidencesRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('emergency.emergency_evidences') IS NULL
+  AND to_regclass('emergency.ix_emergency_evidences_emergency_received_at') IS NULL
+  AND to_regclass('emergency.emergencies') IS NOT NULL
+  AND to_regclass('identity.users') IS NOT NULL
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-020 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2060,7 +2264,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-019)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-020)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2089,12 +2293,21 @@ try {
   Test-UserCredentialsAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-013)' -Command @('update', '--label-filter=hu-db-013')
   Test-UserSessionsAcceptance
-  Invoke-Liquibase -Phase 'rollback-count (HU-DB-013)' -Command @('rollback-count', '--count=5')
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-013)' -Command @('rollback-count', '--count=3')
   Test-UserSessionsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-013)' -Command @('update', '--label-filter=hu-db-013')
   Test-UserSessionsAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-012)' -Command @('update', '--label-filter=hu-db-012')
   Test-UserVerificationCodesAcceptance
+  $sessionHashFunctionGrant = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  has_function_privilege('alertamujer_app', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+  if ($sessionHashFunctionGrant -ne 'OK') {
+    throw 'HU-DB-012 session refresh-token hash function access verification failed.'
+  }
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-012)' -Command @('rollback-count', '--count=5')
   Test-UserVerificationCodesRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update', '--label-filter=hu-db-012')
@@ -2131,6 +2344,12 @@ try {
   Test-EmergencyLocationsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-019)' -Command @('update', '--label-filter=hu-db-019')
   Test-EmergencyLocationsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-020)' -Command @('update', '--label-filter=hu-db-020')
+  Test-EmergencyEvidencesAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-020)' -Command @('rollback-count', '--count=3')
+  Test-EmergencyEvidencesRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-020)' -Command @('update', '--label-filter=hu-db-020')
+  Test-EmergencyEvidencesAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

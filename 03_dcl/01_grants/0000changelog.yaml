@@ -120,33 +120,18 @@ databaseChangeLog:
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
-      id: AM-BD-013-05-grant-user-session-refresh-token-hash-function-execute
-      author: FreinierCardona
-      labels: "hu-db-013,dcl,identity,security,function"
-      comment: Grants the application only the refresh-token hash lookup needed by session identifier.
-      changes:
-        - sqlFile:
-            path: 009_grant_user_session_refresh_token_hash_function_execute.sql
-            relativeToChangelogFile: true
-            stripComments: false
-      rollback:
-        - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/009_grant_user_session_refresh_token_hash_function_execute.rollback.sql
-            relativeToChangelogFile: true
-            stripComments: false
-  - changeSet:
       id: AM-BD-014-02-grant-user-emergency-settings-minimum-access
       author: FreinierCardona
       labels: "hu-db-014,dcl,profile,security"
       comment: Grants the application only the SOS message personalization lifecycle access.
       changes:
         - sqlFile:
-            path: 010_grant_user_emergency_settings_minimum_access.sql
+            path: 009_grant_user_emergency_settings_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/010_grant_user_emergency_settings_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/009_grant_user_emergency_settings_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
@@ -156,12 +141,12 @@ databaseChangeLog:
       comment: Grants the application the emergency-contact lifecycle access.
       changes:
         - sqlFile:
-            path: 011_grant_emergency_contacts_minimum_access.sql
+            path: 010_grant_emergency_contacts_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/011_grant_emergency_contacts_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/010_grant_emergency_contacts_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
@@ -171,12 +156,12 @@ databaseChangeLog:
       comment: Grants the application only the FCM token lifecycle access required by the notification flow.
       changes:
         - sqlFile:
-            path: 012_grant_user_device_tokens_minimum_access.sql
+            path: 011_grant_user_device_tokens_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/012_grant_user_device_tokens_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/011_grant_user_device_tokens_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
@@ -186,12 +171,12 @@ databaseChangeLog:
       comment: Grants the application only the SOS emergency lifecycle access.
       changes:
         - sqlFile:
-            path: 013_grant_emergencies_minimum_access.sql
+            path: 012_grant_emergencies_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/013_grant_emergencies_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/012_grant_emergencies_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
@@ -201,12 +186,12 @@ databaseChangeLog:
       comment: Grants append-only emergency lifecycle history access to the application role.
       changes:
         - sqlFile:
-            path: 014_grant_emergency_status_history_minimum_access.sql
+            path: 013_grant_emergency_status_history_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/014_grant_emergency_status_history_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/013_grant_emergency_status_history_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
   - changeSet:
@@ -216,11 +201,26 @@ databaseChangeLog:
       comment: Grants confirmed emergency location reads and inserts to the application role.
       changes:
         - sqlFile:
-            path: 015_grant_emergency_locations_minimum_access.sql
+            path: 014_grant_emergency_locations_minimum_access.sql
             relativeToChangelogFile: true
             stripComments: false
       rollback:
         - sqlFile:
-            path: ../../05_rollbacks/03_dcl/01_grants/015_grant_emergency_locations_minimum_access.rollback.sql
+            path: ../../05_rollbacks/03_dcl/01_grants/014_grant_emergency_locations_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-020-03-grant-emergency-evidences-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-020,dcl,emergency,security"
+      comment: Grants the application confirmed emergency evidence reads and inserts only.
+      changes:
+        - sqlFile:
+            path: 015_grant_emergency_evidences_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/015_grant_emergency_evidences_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false

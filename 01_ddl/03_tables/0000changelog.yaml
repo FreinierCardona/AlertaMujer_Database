@@ -179,3 +179,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/03_tables/012_create_emergency_locations_table.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-020-01-create-emergency-evidences-table
+      author: FreinierCardona
+      labels: "hu-db-020,ddl,emergency,table"
+      comment: Creates confirmed emergency photograph metadata without binary file storage.
+      changes:
+        - sqlFile:
+            path: 013_create_emergency_evidences_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/013_create_emergency_evidences_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
