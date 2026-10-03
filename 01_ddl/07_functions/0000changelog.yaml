@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-012-04-create-identity-authentication-secret-read-functions
+      author: FreinierCardona
+      labels: "hu-db-012,ddl,identity,security,function"
+      comment: Exposes only the hashes required for authentication by identifier, without table-level secret reads.
+      changes:
+        - sqlFile:
+            path: 001_create_identity_authentication_secret_read_functions.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/07_functions/001_create_identity_authentication_secret_read_functions.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

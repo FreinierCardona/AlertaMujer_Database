@@ -29,3 +29,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/10_indexes/002_create_users_single_entity_admin_index.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-012-02-create-user-verification-codes-context-indexes
+      author: FreinierCardona
+      labels: "hu-db-012,ddl,identity,index"
+      comment: Indexes OTP context lookups and scheduled expiration purges.
+      changes:
+        - sqlFile:
+            path: 003_create_user_verification_codes_context_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/003_create_user_verification_codes_context_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

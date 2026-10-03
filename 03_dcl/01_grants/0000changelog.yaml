@@ -74,3 +74,33 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/005_grant_user_credentials_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-012-03-grant-user-verification-codes-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-012,dcl,identity,security"
+      comment: Grants OTP workflow access without exposing code hashes for reads.
+      changes:
+        - sqlFile:
+            path: 006_grant_user_verification_codes_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/006_grant_user_verification_codes_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-012-05-grant-identity-authentication-secret-function-execute
+      author: FreinierCardona
+      labels: "hu-db-012,dcl,identity,security,function"
+      comment: Grants the application only the authentication hash lookups required by the documented identity flows.
+      changes:
+        - sqlFile:
+            path: 007_grant_identity_authentication_secret_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/007_grant_identity_authentication_secret_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
