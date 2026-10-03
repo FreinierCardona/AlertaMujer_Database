@@ -104,3 +104,33 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/007_grant_identity_authentication_secret_function_execute.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-013-04-grant-user-sessions-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-013,dcl,identity,security"
+      comment: Grants session lifecycle access without exposing refresh-token hashes for reads.
+      changes:
+        - sqlFile:
+            path: 008_grant_user_sessions_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/008_grant_user_sessions_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-013-05-grant-user-session-refresh-token-hash-function-execute
+      author: FreinierCardona
+      labels: "hu-db-013,dcl,identity,security,function"
+      comment: Grants the application only the refresh-token hash lookup needed by session identifier.
+      changes:
+        - sqlFile:
+            path: 009_grant_user_session_refresh_token_hash_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/009_grant_user_session_refresh_token_hash_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

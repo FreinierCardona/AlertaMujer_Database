@@ -891,6 +891,199 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UserSessionsAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-03 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000040', 'session.user', 'Session', 'User',
+    'session.user@example.test', '3000000040', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_sessions (
+    session_id, user_id, refresh_token_hash, client_type, device_label,
+    last_used_at, expires_at, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000141',
+    '00000000-0000-0000-0000-000000000040', '$2b$12$mobile-refresh-token-hash',
+    'MOBILE', 'Session test device', created_at_value,
+    created_at_value + INTERVAL '2 months', created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000142',
+      '00000000-0000-0000-0000-000000000040', '$2b$12$mobile-refresh-token-hash',
+      'MOBILE', created_at_value, created_at_value + INTERVAL '2 months', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed a duplicate refresh-token hash.';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000143',
+      '00000000-0000-0000-0000-000000000099', '$2b$12$orphan-refresh-token-hash',
+      'MOBILE', created_at_value, created_at_value + INTERVAL '2 months', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed a session without a user.';
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000144',
+      '00000000-0000-0000-0000-000000000040', '$2b$12$invalid-client-refresh-token-hash',
+      'WEB', created_at_value, created_at_value + INTERVAL '10 minutes', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed a client type outside its documented domain.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000145',
+      '00000000-0000-0000-0000-000000000040', '$2b$12$invalid-expiry-refresh-token-hash',
+      'ADMIN_WEB', created_at_value, created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed an expiry that does not follow last use.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000146',
+      '00000000-0000-0000-0000-000000000040', '$2b$12$invalid-last-use-refresh-token-hash',
+      'ADMIN_WEB', created_at_value - INTERVAL '1 second',
+      created_at_value + INTERVAL '10 minutes', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed last use before session creation.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_sessions (
+      session_id, user_id, refresh_token_hash, client_type,
+      last_used_at, expires_at, revoked_at, created_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000147',
+      '00000000-0000-0000-0000-000000000040', '$2b$12$invalid-revocation-refresh-token-hash',
+      'MOBILE', created_at_value, created_at_value + INTERVAL '2 months',
+      created_at_value - INTERVAL '1 second', created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-013 allowed revocation before last use.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000041', 'session.cascade.user', 'Session', 'Cascade',
+    'session.cascade.user@example.test', '3000000041', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.user_sessions (
+    session_id, user_id, refresh_token_hash, client_type,
+    last_used_at, expires_at, created_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000148',
+    '00000000-0000-0000-0000-000000000041', '$2b$12$cascade-refresh-token-hash',
+    'MOBILE', created_at_value, created_at_value + INTERVAL '2 months', created_at_value
+  );
+
+  DELETE FROM identity.users
+   WHERE user_id = '00000000-0000-0000-0000-000000000041';
+
+  IF EXISTS (
+    SELECT 1 FROM identity.user_sessions
+     WHERE session_id = '00000000-0000-0000-0000-000000000148'
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-013 did not delete sessions when their user was deleted.';
+  END IF;
+END
+$$;
+
+SET ROLE alertamujer_app;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.user_sessions', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'identity.user_sessions', 'UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_sessions', 'SELECT')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_sessions', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_sessions', 'TRUNCATE')
+  AND has_column_privilege('alertamujer_app', 'identity.user_sessions', 'session_id', 'SELECT')
+  AND NOT has_column_privilege('alertamujer_app', 'identity.user_sessions', 'refresh_token_hash', 'SELECT')
+  AND has_function_privilege('alertamujer_app', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_user_session_refresh_token_hash(uuid)', 'EXECUTE')
+  AND identity.get_user_session_refresh_token_hash('00000000-0000-0000-0000-000000000141') = '$2b$12$mobile-refresh-token-hash'
+  AND NOT EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'identity'
+       AND table_name = 'user_sessions'
+       AND column_name = 'refresh_token'
+  )
+THEN 'OK' ELSE 'FAILED' END;
+
+RESET ROLE;
+
+DELETE FROM identity.users
+ WHERE user_id = '00000000-0000-0000-0000-000000000040';
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-013 acceptance verification failed: $result"
+  }
+}
+
+function Test-UserSessionsRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.user_sessions') IS NULL
+  AND to_regclass('identity.ix_user_sessions_user_id') IS NULL
+  AND to_regclass('identity.ix_user_sessions_expires_at') IS NULL
+  AND to_regprocedure('identity.get_user_session_refresh_token_hash(uuid)') IS NULL
+  AND to_regclass('identity.users') IS NOT NULL
+  AND to_regclass('identity.user_credentials') IS NOT NULL
+  AND (SELECT count(*) FROM configuration.system_configuration) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-013 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -905,7 +1098,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-012)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-013)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -926,12 +1119,19 @@ try {
   Test-UserCredentialsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-011)' -Command @('update', '--label-filter=hu-db-011')
   Test-UserCredentialsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-013)' -Command @('update', '--label-filter=hu-db-013')
+  Test-UserSessionsAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-013)' -Command @('rollback-count', '--count=5')
+  Test-UserSessionsRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-013)' -Command @('update', '--label-filter=hu-db-013')
+  Test-UserSessionsAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-012)' -Command @('update', '--label-filter=hu-db-012')
   Test-UserVerificationCodesAcceptance
   Invoke-Liquibase -Phase 'rollback-count (HU-DB-012)' -Command @('rollback-count', '--count=5')
   Test-UserVerificationCodesRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-012)' -Command @('update')
   Test-UserVerificationCodesAcceptance
+  Test-UserSessionsAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
