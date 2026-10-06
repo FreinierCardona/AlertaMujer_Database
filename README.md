@@ -1,132 +1,132 @@
 # AlertaMujer Database
 
-Repositorio de PostgreSQL y Liquibase de AlertaMujer. Centraliza la infraestructura local y el versionamiento de los changesets entregados para las HUs de base de datos; no contiene datos reales.
+Repositorio de la base de datos PostgreSQL de AlertaMujer. Contiene la infraestructura local Docker, los changesets Liquibase, los rollbacks y las verificaciones de release. No contiene datos reales ni código del backend.
 
-## Estructura del repositorio
+## Requisitos
+
+- Docker Desktop con Docker Compose v2.
+- PowerShell para ejecutar los scripts `.ps1`.
+- Puerto local `5434` disponible, salvo que se cambie `POSTGRES_PORT` en `.env`.
+
+## Inicio rápido
+
+Desde la raíz del repositorio:
+
+```powershell
+Copy-Item .env.example .env
+# Edite .env y reemplace cada valor CAMBIAR por una contraseña local segura.
+
+# Inicia PostgreSQL y aplica los changesets pendientes con Liquibase.
+docker compose up
+```
+
+Para dejar los servicios en segundo plano:
+
+```powershell
+docker compose up -d
+docker compose logs liquibase
+```
+
+PostgreSQL queda disponible desde el equipo en `127.0.0.1:5434` y dentro de Docker en `postgres:5433` por defecto. Liquibase espera el healthcheck de PostgreSQL, ejecuta `update` y termina.
+
+Detener sin borrar datos:
+
+```powershell
+docker compose down
+```
+
+Reiniciar la base local desde cero:
+
+```powershell
+docker compose down --volumes
+```
+
+El segundo comando elimina el volumen local y no se puede deshacer.
+
+## Estructura
 
 ```text
 AlertaMujer_Database/
-├── 01_ddl/              # Estructuras de base de datos.
-├── 02_dml/              # Datos controlados.
-├── 03_dcl/              # Roles, permisos y políticas.
-├── 04_tcl/              # Operaciones transaccionales y versiones.
-├── 05_rollbacks/        # Reversiones de futuros changesets.
-├── changelog/           # Punto de entrada de Liquibase.
-├── docker/              # Inicialización técnica de PostgreSQL.
-├── scripts/             # Operación y verificación local.
-├── Dockerfile
+├── 01_ddl/          # Extensiones, schemas, tablas, restricciones, alteraciones e índices.
+├── 02_dml/          # Datos técnicos controlados, seeds y ajustes de datos.
+├── 03_dcl/          # Roles, grants y políticas de acceso.
+├── 04_tcl/          # Bloques transaccionales y etiquetas de release.
+├── 05_rollbacks/    # Rollback de cada changeset, con estructura espejo.
+├── changelog/       # changelog-master.yaml y cadena principal de Liquibase.
+├── docker/initdb/   # Inicialización y reconciliación de roles PostgreSQL.
+├── scripts/         # Arranque, verificaciones y prueba aislada de release.
 ├── docker-compose.yml
+├── Dockerfile
 ├── liquibase.properties
 └── .env.example
 ```
 
-## Estructura de changelogs
+Los archivos `0000changelog.yaml` encadenan los changesets de cada módulo. Todo cambio de esquema, dato controlado o privilegio debe incluir su SQL de avance, rollback, referencia desde el changelog y etiqueta de la HU correspondiente. Los changesets aplicados son inmutables: una corrección se agrega como migration nueva.
 
-```text
-changelog/
-└── changelog-master.yaml
-    ├── ../01_ddl/changelog.yaml
-    │   └── 00_extensions … 10_indexes/0000changelog.yaml
-    ├── ../02_dml/changelog.yaml
-    │   └── 00_inserts … 04_patches/0000changelog.yaml
-    ├── ../03_dcl/changelog.yaml
-    │   └── 00_roles … 02_policies/0000changelog.yaml
-    └── ../04_tcl/changelog.yaml
-        └── 00_transaction_blocks … 02_release_tags/0000changelog.yaml
-```
+## Roles operativos
 
-Los changelogs internos son el lugar exclusivo para registrar changesets, respetando el orden DDL, DML, DCL y TCL.
-
-## Roles técnicos y privilegios
-
-| Rol | Uso | Privilegios efectivos |
+| Rol | Uso | Alcance |
 | --- | --- | --- |
-| `POSTGRES_USER` | Inicialización y reconciliación administrativa del contenedor. | Administra el clúster y los roles técnicos; no lo usa el backend ni Liquibase durante las migraciones ordinarias. |
-| `alertamujer_owner` | Propietario técnico sin inicio de sesión. | Posee `public` y los schemas funcionales; puede crear objetos en la base y gestionar los metadatos de Liquibase. |
-| `alertamujer_migrator` | Liquibase. | Inicia sesión, pertenece a `alertamujer_owner` y opera como owner al ejecutar migrations. Puede administrar roles técnicos, pero no es superusuario ni puede crear bases. |
-| `alertamujer_app` | Backend de AlertaMujer. | Puede conectarse y usar los schemas funcionales. Los objetos futuros reciben solo el DML mínimo: lectura en `configuration`; lectura/inserción/actualización en `identity`, `profile`, `contacts` y `notification`; lectura/inserción en `emergency` y `audit`. No recibe DDL, `TRUNCATE` ni privilegios predeterminados de `DELETE`. |
+| `alertamujer_owner` | Propietario técnico sin inicio de sesión. | Es dueño de `public` y de los schemas funcionales. No lo usa el backend. |
+| `alertamujer_migrator` | Usuario de Liquibase. | Inicia sesión, asume `alertamujer_owner` y ejecuta migrations. No es superusuario ni crea bases de datos. |
+| `alertamujer_app` | Usuario del backend. | Tiene solo `CONNECT`, `USAGE` y DML explícito. No recibe DDL, `TRUNCATE` ni administración de roles. |
 
-En `identity.registration_requests`, `alertamujer_app` inserta y actualiza el flujo temporal, pero su `SELECT` es por columnas y excluye `password_hash`.
+`alertamujer_app` puede eliminar únicamente `identity.registration_requests`, `identity.user_verification_codes` e `identity.users`, para purgas técnicas y el borrado terminal de cuenta. No recibe `DELETE` sobre emergencias, evidencias, sesiones, notificaciones, mensajes ni auditoría. La autorización del flujo sigue siendo responsabilidad del backend.
 
-En `identity.users`, `alertamujer_app` tiene `SELECT`, `INSERT` y `UPDATE` para el ciclo de vida de cuentas; no recibe `DELETE`, `TRUNCATE` ni permisos de administración.
+Las credenciales viven exclusivamente en `.env`. Los nombres de aplicación y migración son fijos: `alertamujer_app` y `alertamujer_migrator`.
 
-Las tablas de credenciales, solicitudes de registro, OTP y sesiones no exponen hashes mediante `SELECT` al rol de aplicación. Para las verificaciones de autenticación de las HUs implementadas, `alertamujer_app` solo puede ejecutar `identity.get_user_password_hash(uuid)`, `identity.get_registration_password_hash(uuid)`, `identity.get_verification_code_hash(uuid)` e `identity.get_user_session_refresh_token_hash(uuid)`. Cada función recibe un identificador y devuelve exclusivamente el hash asociado; el backend conserva la autorización del flujo y la comparación segura.
+## Docker y Liquibase
 
-Las contraseñas no se versionan. `POSTGRES_USER`/`POSTGRES_PASSWORD`, `APP_DB_USER`/`APP_DB_PASSWORD` y `MIGRATOR_DB_USER`/`MIGRATOR_DB_PASSWORD` se leen de `.env`. Los nombres de aplicación y migración están fijados como `alertamujer_app` y `alertamujer_migrator`; el script rechaza otros nombres. En un volumen existente, cambiar una contraseña en `.env` requiere ejecutar `./scripts/reconcile-technical-roles.ps1` para aplicarla en PostgreSQL; editar `.env` por sí solo no rota credenciales ya persistidas.
-
-## Configuración operativa global
-
-`configuration.system_configuration` contiene la única configuración global aprobada para SOS, heartbeat, evidencia, chat y OTP. La fila inicial usa los límites vigentes del proyecto; su PK y `CHECK (configuration_id = 1)` impiden una segunda configuración, todos los límites son positivos y el timeout de desconexión debe superar el intervalo de heartbeat.
-
-El backend consulta estos valores y conserva los hechos aplicados en sus entidades operativas futuras. `alertamujer_app` tiene únicamente `SELECT` sobre esta tabla; los cambios se entregan mediante un nuevo changeset con su rollback, nunca mediante una pantalla administrativa ni Compose.
-
-## Inicio local
-
-Requiere Docker Desktop y el puerto `5434` disponible.
+Comprobar la configuración de Compose:
 
 ```powershell
-Copy-Item .env.example .env
-# Edite .env y defina POSTGRES_PASSWORD, APP_DB_PASSWORD y MIGRATOR_DB_PASSWORD.
-
-# PostgreSQL y Liquibase; Liquibase aplica los changesets pendientes.
-docker compose up
-
-# La misma operación en segundo plano.
-docker compose up -d
+docker compose config --quiet
 ```
 
-PostgreSQL inicia primero. Cuando su `healthcheck` es satisfactorio, Liquibase ejecuta `update` una vez y termina con el resultado de la migración. Liquibase se conecta internamente a `postgres:5433`; desde el equipo local PostgreSQL está disponible en `127.0.0.1:5434`.
-
-## Liquibase
-
-Si ya existía el volumen antes de hu-db-006, reconcilie primero los roles técnicos desde `.env`; este paso no imprime las contraseñas ni modifica changelogs.
+Operar Liquibase manualmente:
 
 ```powershell
-.\scripts\reconcile-technical-roles.ps1
-```
-
-```powershell
-# Valida archivos y referencias sin aplicar cambios.
+# Valida changelogs, rutas y referencias sin cambiar la base.
 docker compose run --rm liquibase validate
 
-# Ejecuta manualmente los changesets pendientes.
+# Muestra los changesets pendientes.
+docker compose run --rm liquibase status --verbose
+
+# Muestra el SQL que se ejecutaría, sin aplicarlo.
+docker compose run --rm liquibase update-sql
+
+# Aplica los changesets pendientes.
 docker compose run --rm liquibase update
 
-# Muestra el estado detallado.
-docker compose run --rm liquibase status --verbose
+# Consulta el historial aplicado.
+docker compose run --rm liquibase history
 ```
 
-## Verificación y detención
+Liquibase siempre se conecta con `alertamujer_migrator`; el backend nunca ejecuta migrations. Para una base ya creada antes de cambiar las credenciales de `.env`, ejecute primero la reconciliación de roles.
+
+## Scripts
+
+| Archivo | Ejecución | Función |
+| --- | --- | --- |
+| `scripts/start-postgres.ps1` | `./scripts/start-postgres.ps1` | Valida Compose, inicia solo PostgreSQL, espera su healthcheck y muestra el endpoint publicado. No ejecuta Liquibase. |
+| `scripts/verify-postgres.ps1` | `./scripts/verify-postgres.ps1` | Inicia PostgreSQL si es necesario; valida conexión con `alertamujer_app`, UTF-8, UTC y persistencia del volumen tras reiniciar el contenedor. |
+| `scripts/reconcile-technical-roles.ps1` | `./scripts/reconcile-technical-roles.ps1` | Aplica al volumen existente las credenciales y propiedad técnica definidas en `.env`. Úselo después de cambiar contraseñas locales. |
+| `scripts/verify-technical-roles.ps1` | `./scripts/verify-technical-roles.ps1` | Comprueba membresía del migrador en el owner, `USAGE` de la aplicación y ausencia de privilegios DDL para aplicación y `PUBLIC`. |
+| `scripts/test-release.ps1` | `./scripts/test-release.ps1 -ReleaseTag alertamujer-db-vX.Y.Z` | Crea una infraestructura aislada, ejecuta validación, update, pruebas de aceptación, rollback/reaplicación, fingerprint, tag y comprobación de locks. Elimina sus recursos al terminar. Use `-KeepEnvironment` solo para diagnosticar un fallo. |
+| `docker/initdb/10-create-application-role.sh` | No se ejecuta manualmente desde el host. | Se ejecuta al inicializar PostgreSQL y desde el script de reconciliación. Valida los nombres fijos de roles, crea o actualiza credenciales, configura owner/migrator y otorga conectividad a la aplicación. |
+
+Ejemplo de validación de release:
 
 ```powershell
-# Salud, usuario de aplicación, UTF-8, UTC y persistencia.
-.\scripts\verify-postgres.ps1
-
-# Estado y registros.
-docker compose ps
-docker compose logs postgres
-
-# Matriz de roles: migrator/owner, app sin DDL y PUBLIC sin CREATE.
-.\scripts\verify-technical-roles.ps1
-
-# Detiene contenedores y conserva el volumen.
-docker compose down
+./scripts/test-release.ps1 -ReleaseTag alertamujer-db-v1.0.24
 ```
 
-Para reiniciar deliberadamente la base local, use `docker compose down --volumes`; elimina sus datos y no se puede deshacer.
+Una release se considera validada únicamente cuando el script termina con `Release validation passed`.
 
-## Validación de releases
+## Convenciones de trabajo
 
-Antes de integrar una release, ejecute el ciclo completo en una base efímera:
-
-```powershell
-.\scripts\test-release.ps1 -ReleaseTag alertamujer-db-v0.12.0
-```
-
-El script crea un proyecto Compose, contenedor, red y volumen con nombres únicos; no reutiliza la base local ni publica un puerto fijo. Ejecuta `validate`, `status`, `update-sql`, `update`, las verificaciones de aceptación de las HUs implementadas, `history`, `rollback-count-sql`, `rollback-count`, `updateTestingRollback`, el tag de release y un segundo `update`. Además comprueba que el tag exista exactamente una vez, que el esquema sea idéntico tras revertir y reaplicar, y que no queden locks. El entorno efímero se elimina incluso si una fase falla; la salida nativa de Liquibase conserva el changeset o precondición causante. Use `-KeepEnvironment` solo para diagnóstico.
-
-Los changesets ya aplicados son inmutables: una corrección se entrega en un changeset nuevo. Para cambios incompatibles, planifique expandir, migrar y contraer en releases separadas; el tag debe respetar el formato `alertamujer-db-vX.Y.Z`.
-
-## Configuración
-
-`.env` contiene credenciales locales y no se versiona. `liquibase.properties` solo define la configuración reutilizable de Liquibase; Docker Compose entrega las credenciales al ejecutar el contenedor.
+1. Cree una rama `feat/hu-db-NNN-dev` desde `develop` limpio.
+2. Agregue migration y rollback sin modificar changesets ya aplicados.
+3. Actualice el changelog y la prueba de release cuando cambie una regla persistente o un privilegio.
+4. Ejecute `docker compose run --rm liquibase validate` y `./scripts/test-release.ps1`.
+5. Confirme los cambios y publique la rama; `develop` solo recibe cambios integrados.

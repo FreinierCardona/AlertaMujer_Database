@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-024-01-restrict-verification-code-context-purpose-channel
+      author: FreinierCardona
+      labels: "hu-db-024,ddl,identity,security"
+      comment: Restricts OTP purposes and channels to their documented identity contexts.
+      changes:
+        - sqlFile:
+            path: 001_add_verification_codes_context_purpose_channel_check.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/001_add_verification_codes_context_purpose_channel_check.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
