@@ -2918,6 +2918,144 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-RegistrationRequestOriginTermsFixAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-05 00:00:00+00';
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM identity.registration_requests
+     WHERE account_origin IS DISTINCT FROM 'SELF_REGISTERED'
+        OR accepted_terms_at IS DISTINCT FROM created_at
+  ) THEN
+    RAISE EXCEPTION 'HU-DB-025 did not backfill existing registration requests as self-registered.';
+  END IF;
+
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email, phone,
+    password_hash, status, account_origin, accepted_terms_at, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000701', 'terms.self', 'Terms', 'Self',
+    'terms.self@example.test', '3000000701', '$2b$12$terms-self-request-hash',
+    'PENDING', 'SELF_REGISTERED', created_at_value,
+    created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email, phone,
+    password_hash, status, account_origin, accepted_terms_at, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000702', 'terms.admin', 'Terms', 'Admin',
+    'terms.admin@example.test', '3000000702', '$2b$12$terms-admin-request-hash',
+    'PENDING', 'ADMIN_CREATED', NULL,
+    created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email, phone,
+      password_hash, status, account_origin, accepted_terms_at, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000703', 'terms.missing', 'Terms', 'Missing',
+      'terms.missing@example.test', '3000000703', '$2b$12$terms-missing-request-hash',
+      'PENDING', 'SELF_REGISTERED', NULL,
+      created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-025 allowed a self-registered request without terms acceptance.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email, phone,
+      password_hash, status, account_origin, accepted_terms_at, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000704', 'terms.invalid', 'Terms', 'Invalid',
+      'terms.invalid@example.test', '3000000704', '$2b$12$terms-invalid-request-hash',
+      'PENDING', 'ADMIN_CREATED', created_at_value,
+      created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-025 allowed an administrative request with terms accepted by another actor.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.registration_requests (
+      registration_request_id, username, first_names, last_names, email, phone,
+      password_hash, status, account_origin, accepted_terms_at, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000705', 'terms.origin', 'Terms', 'Origin',
+      'terms.origin@example.test', '3000000705', '$2b$12$terms-origin-request-hash',
+      'PENDING', 'UNSUPPORTED', NULL,
+      created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-025 allowed an unsupported account origin.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  DELETE FROM identity.registration_requests
+   WHERE registration_request_id IN (
+     '00000000-0000-0000-0000-000000000701',
+     '00000000-0000-0000-0000-000000000702'
+   );
+END
+$$;
+
+SELECT CASE WHEN
+  has_column_privilege('alertamujer_app', 'identity.registration_requests', 'account_origin', 'SELECT')
+  AND has_column_privilege('alertamujer_app', 'identity.registration_requests', 'accepted_terms_at', 'SELECT')
+  AND NOT has_column_privilege('alertamujer_app', 'identity.registration_requests', 'password_hash', 'SELECT')
+  AND EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conname = 'ck_registration_requests_account_origin'
+  )
+  AND EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conname = 'ck_registration_requests_origin_terms'
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-025 acceptance verification failed: $result"
+  }
+}
+
+function Test-RegistrationRequestOriginTermsFixRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regclass('identity.registration_requests') IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'identity'
+       AND table_name = 'registration_requests'
+       AND column_name IN ('account_origin', 'accepted_terms_at')
+  )
+  AND NOT EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conname IN (
+       'ck_registration_requests_account_origin',
+       'ck_registration_requests_origin_terms'
+     )
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-025 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2932,7 +3070,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-024)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-025)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -3038,6 +3176,12 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-AuditLogsAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-024)' -Command @('update', '--label-filter=hu-db-024')
   Test-IdentityLifecycleCloseoutAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-025)' -Command @('update', '--label-filter=hu-db-025')
+  Test-RegistrationRequestOriginTermsFixAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-025)' -Command @('rollback-count', '--count=2')
+  Test-RegistrationRequestOriginTermsFixRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-025)' -Command @('update', '--label-filter=hu-db-025')
+  Test-RegistrationRequestOriginTermsFixAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
