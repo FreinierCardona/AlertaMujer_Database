@@ -2841,6 +2841,83 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-IdentityLifecycleCloseoutAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-05 00:00:00+00';
+BEGIN
+  INSERT INTO identity.users (
+    user_id, username, first_names, last_names, email, phone, role,
+    account_status, account_origin, accepted_terms_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000601', 'lifecycle.user', 'Lifecycle', 'User',
+    'lifecycle.user@example.test', '3000000601', 'USER', 'ENABLED',
+    'SELF_REGISTERED', created_at_value, created_at_value, created_at_value
+  );
+
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email, phone,
+    password_hash, status, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000602', 'lifecycle.request', 'Lifecycle', 'Request',
+    'lifecycle.request@example.test', '3000000602', '$2b$12$lifecycle-request-hash',
+    'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value
+  );
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      user_id, channel, purpose, destination_snapshot, code_hash, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000601', 'EMAIL', 'EMAIL_VERIFICATION',
+      'lifecycle.user@example.test', '$2b$12$invalid-user-context',
+      created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-024 allowed initial email verification on an existing account.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO identity.user_verification_codes (
+      registration_request_id, channel, purpose, destination_snapshot, code_hash, expires_at, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000602', 'EMAIL', 'PASSWORD_RESET',
+      'lifecycle.request@example.test', '$2b$12$invalid-request-context',
+      created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+    );
+    RAISE EXCEPTION 'HU-DB-024 allowed password reset on a registration request.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  INSERT INTO identity.user_verification_codes (
+    user_id, channel, purpose, destination_snapshot, code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000601', 'SMS', 'PROFILE_CONTACT_CHANGE',
+    '3000000601', '$2b$12$valid-profile-change',
+    created_at_value + INTERVAL '3 hours', created_at_value, created_at_value
+  );
+END
+$$;
+
+SELECT CASE WHEN
+  has_table_privilege('alertamujer_app', 'identity.registration_requests', 'DELETE')
+  AND has_table_privilege('alertamujer_app', 'identity.user_verification_codes', 'DELETE')
+  AND has_table_privilege('alertamujer_app', 'identity.users', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_credentials', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_sessions', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'emergency.emergencies', 'DELETE')
+  AND NOT has_table_privilege('alertamujer_app', 'audit.audit_logs', 'DELETE')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-024 acceptance verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -2855,7 +2932,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-023)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-024)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -2959,6 +3036,8 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-AuditLogsRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-023)' -Command @('update', '--label-filter=hu-db-023')
   Test-AuditLogsAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-024)' -Command @('update', '--label-filter=hu-db-024')
+  Test-IdentityLifecycleCloseoutAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

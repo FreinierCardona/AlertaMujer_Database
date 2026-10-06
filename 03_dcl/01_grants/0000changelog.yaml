@@ -269,3 +269,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/018_grant_audit_logs_minimum_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-024-02-grant-identity-lifecycle-delete-access
+      author: FreinierCardona
+      labels: "hu-db-024,dcl,identity,security"
+      comment: Grants the application only the deletes required by identity cleanup and terminal account deletion.
+      changes:
+        - sqlFile:
+            path: 019_grant_identity_lifecycle_delete_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/019_grant_identity_lifecycle_delete_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

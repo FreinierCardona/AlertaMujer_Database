@@ -1,0 +1,2 @@
+ALTER TABLE identity.user_verification_codes
+  DROP CONSTRAINT IF EXISTS ck_user_verification_codes_context_purpose_channel;
