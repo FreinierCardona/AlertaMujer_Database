@@ -284,3 +284,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/019_grant_identity_lifecycle_delete_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-025-02-grant-registration-request-origin-terms-read-access
+      author: FreinierCardona
+      labels: "hu-db-025,dcl,identity,security,fix"
+      comment: Grants the application only the registration-request fields needed to complete account creation.
+      changes:
+        - sqlFile:
+            path: 020_grant_registration_request_origin_terms_read_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/020_grant_registration_request_origin_terms_read_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

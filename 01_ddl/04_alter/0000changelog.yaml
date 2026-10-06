@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/04_alter/001_add_verification_codes_context_purpose_channel_check.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-025-01-add-registration-request-origin-and-terms
+      author: FreinierCardona
+      labels: "hu-db-025,ddl,identity,fix"
+      comment: Persists account origin and terms acceptance on pending registration requests.
+      changes:
+        - sqlFile:
+            path: 002_add_registration_request_origin_and_terms.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/002_add_registration_request_origin_and_terms.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
