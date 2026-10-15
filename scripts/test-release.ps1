@@ -2377,6 +2377,75 @@ SELECT 'OK';
 '@ | Out-Null
 }
 
+function New-FcmStorageRemovalOperationalFixture {
+  Invoke-PostgresScalar -Sql @'
+INSERT INTO identity.users (
+  user_id, username, first_names, last_names, email, phone, role,
+  account_status, account_origin, accepted_terms_at, created_at, updated_at
+) VALUES
+  ('00000000-0000-0000-0000-000000000901', 'fcmremoval.owner', 'FCM Removal', 'Owner', 'fcmremoval.owner@example.test', '3000000901', 'USER', 'ENABLED', 'SELF_REGISTERED', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00'),
+  ('00000000-0000-0000-0000-000000000902', 'fcmremoval.contact', 'FCM Removal', 'Contact', 'fcmremoval.contact@example.test', '3000000902', 'USER', 'ENABLED', 'SELF_REGISTERED', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00');
+
+INSERT INTO contacts.emergency_contacts (contact_id, owner_user_id, contact_user_id, relationship_status, status_changed_at, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000903', '00000000-0000-0000-0000-000000000901', '00000000-0000-0000-0000-000000000902', 'ACCEPTED', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00');
+
+INSERT INTO emergency.emergencies (emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000904', '00000000-0000-0000-0000-000000000901', 'ACTIVE', 'Operational data must survive FCM removal.', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00');
+
+INSERT INTO emergency.emergency_locations (location_id, emergency_id, latitude, longitude, accuracy_meters, captured_at, received_at)
+VALUES ('00000000-0000-0000-0000-000000000905', '00000000-0000-0000-0000-000000000904', 4.609710, -74.081750, 5, '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00');
+
+INSERT INTO emergency.emergency_evidences (evidence_id, emergency_id, evidence_sequence, file_reference, mime_type, file_size_bytes, received_at)
+VALUES ('00000000-0000-0000-0000-000000000906', '00000000-0000-0000-0000-000000000904', 1, 'fcm-removal-evidence-906', 'image/webp', 500000, '2026-10-14 00:00:00+00');
+
+SELECT 'OK';
+'@ | Out-Null
+}
+
+function Test-FcmStorageRemovalAcceptance {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regnamespace('notification') IS NULL
+  AND to_regclass('notification.user_device_tokens') IS NULL
+  AND to_regclass('notification.emergency_notification_attempts') IS NULL
+  AND to_regclass('notification.ix_user_device_tokens_active_recent') IS NULL
+  AND to_regclass('notification.ix_emergency_notification_attempts_contact_attempted_at') IS NULL
+  AND NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee = 'alertamujer_app' AND table_schema = 'notification')
+  AND EXISTS (SELECT 1 FROM contacts.emergency_contacts WHERE contact_id = '00000000-0000-0000-0000-000000000903')
+  AND EXISTS (SELECT 1 FROM emergency.emergencies WHERE emergency_id = '00000000-0000-0000-0000-000000000904')
+  AND EXISTS (SELECT 1 FROM emergency.emergency_locations WHERE location_id = '00000000-0000-0000-0000-000000000905')
+  AND EXISTS (SELECT 1 FROM emergency.emergency_evidences WHERE evidence_id = '00000000-0000-0000-0000-000000000906')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') { throw "HU-DB-027 acceptance verification failed: $result" }
+}
+
+function Test-FcmStorageRemovalRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regnamespace('notification') IS NOT NULL
+  AND to_regclass('notification.user_device_tokens') IS NOT NULL
+  AND to_regclass('notification.emergency_notification_attempts') IS NOT NULL
+  AND to_regclass('notification.ix_user_device_tokens_active_recent') IS NOT NULL
+  AND to_regclass('notification.ix_emergency_notification_attempts_contact_attempted_at') IS NOT NULL
+  AND (SELECT count(*) FROM notification.user_device_tokens) = 0
+  AND (SELECT count(*) FROM notification.emergency_notification_attempts) = 0
+  AND has_schema_privilege('alertamujer_app', 'notification', 'USAGE')
+  AND has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'SELECT, INSERT, UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.user_device_tokens', 'DELETE')
+  AND has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'SELECT, INSERT, UPDATE')
+  AND NOT has_table_privilege('alertamujer_app', 'notification.emergency_notification_attempts', 'DELETE')
+  AND EXISTS (SELECT 1 FROM contacts.emergency_contacts WHERE contact_id = '00000000-0000-0000-0000-000000000903')
+  AND EXISTS (SELECT 1 FROM emergency.emergencies WHERE emergency_id = '00000000-0000-0000-0000-000000000904')
+  AND EXISTS (SELECT 1 FROM emergency.emergency_locations WHERE location_id = '00000000-0000-0000-0000-000000000905')
+  AND EXISTS (SELECT 1 FROM emergency.emergency_evidences WHERE evidence_id = '00000000-0000-0000-0000-000000000906')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') { throw "HU-DB-027 rollback verification failed: $result" }
+}
+
 function Test-EmergencyChatMessagesAcceptance {
   $sql = @'
 DO $$
@@ -3317,6 +3386,13 @@ THEN 'OK' ELSE 'FAILED' END;
   Invoke-Liquibase -Phase 'update (restore HU-DB-026)' -Command @('update', '--label-filter=hu-db-026')
   Test-EvidenceLimitAcceptance
   Remove-EvidenceLimitLegacyFixture
+  New-FcmStorageRemovalOperationalFixture
+  Invoke-Liquibase -Phase 'update (HU-DB-027)' -Command @('update', '--label-filter=hu-db-027')
+  Test-FcmStorageRemovalAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-027)' -Command @('rollback-count', '--count=1')
+  Test-FcmStorageRemovalRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-027)' -Command @('update', '--label-filter=hu-db-027')
+  Test-FcmStorageRemovalAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')

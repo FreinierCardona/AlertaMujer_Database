@@ -14,3 +14,8 @@ databaseChangeLog:
       relativeToChangelogFile: true
       contextFilter: 03_dcl
       labels: 02_policies
+  - include:
+      file: 03_retirements/0000changelog.yaml
+      relativeToChangelogFile: true
+      contextFilter: 03_dcl
+      labels: 03_retirements
