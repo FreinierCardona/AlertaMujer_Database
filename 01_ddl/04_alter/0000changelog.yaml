@@ -29,3 +29,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/04_alter/002_add_registration_request_origin_and_terms.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-026-01-reduce-evidence-metadata-size-limit
+      author: FreinierCardona
+      labels: "hu-db-026,ddl,emergency,evidence"
+      comment: Enforces the 500000-byte WebP metadata limit for new evidence while retaining legacy metadata.
+      changes:
+        - sqlFile:
+            path: 003_reduce_evidence_metadata_size_limit.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/003_reduce_evidence_metadata_size_limit.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
