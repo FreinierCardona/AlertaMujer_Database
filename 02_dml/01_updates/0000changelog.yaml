@@ -1,1 +1,16 @@
-databaseChangeLog: []
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-026-02-update-evidence-metadata-size-configuration
+      author: FreinierCardona
+      labels: "hu-db-026,dml,configuration,evidence"
+      comment: Publishes the 500000-byte WebP evidence limit to the application configuration.
+      changes:
+        - sqlFile:
+            path: 001_reduce_evidence_metadata_size_limit.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/02_dml/01_updates/001_reduce_evidence_metadata_size_limit.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

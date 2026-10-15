@@ -2250,6 +2250,133 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function New-EvidenceLimitLegacyFixture {
+  Invoke-PostgresScalar -Sql @'
+INSERT INTO identity.users (
+  user_id, username, first_names, last_names, email, phone, role,
+  account_status, account_origin, accepted_terms_at, created_at, updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000761', 'evidence_legacy_761', 'Evidence', 'Legacy',
+  'evidence.legacy.761@example.test', '3000000761', 'USER', 'ENABLED',
+  'SELF_REGISTERED', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00'
+);
+
+INSERT INTO emergency.emergencies (
+  emergency_id, user_id, status, message_snapshot, started_at, created_at, updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000771', '00000000-0000-0000-0000-000000000761',
+  'ACTIVE', 'Evidence legacy SOS', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00', '2026-10-14 00:00:00+00'
+);
+
+INSERT INTO emergency.emergency_evidences (
+  evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+  file_size_bytes, received_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000781', '00000000-0000-0000-0000-000000000771',
+  1, 'evidence-legacy-781', 'image/webp', 1048576, '2026-10-14 00:00:00+00'
+);
+
+SELECT 'OK';
+'@ | Out-Null
+}
+
+function Test-EvidenceLimitAcceptance {
+  $result = Invoke-PostgresScalar -Sql @'
+BEGIN;
+DELETE FROM emergency.emergency_evidences
+ WHERE evidence_id = '00000000-0000-0000-0000-000000000782';
+
+SET LOCAL ROLE alertamujer_app;
+
+INSERT INTO emergency.emergency_evidences (
+  evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+  file_size_bytes, received_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000782', '00000000-0000-0000-0000-000000000771',
+  2, 'evidence-limit-782', 'image/webp', 500000, '2026-10-14 00:01:00+00'
+);
+
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO emergency.emergency_evidences (
+      evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+      file_size_bytes, received_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000783', '00000000-0000-0000-0000-000000000771',
+      3, 'evidence-limit-783', 'image/webp', 500001, '2026-10-14 00:02:00+00'
+    );
+    RAISE EXCEPTION 'HU-DB-026 allowed metadata above 500000 bytes.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+END
+$$;
+
+RESET ROLE;
+COMMIT;
+
+SELECT CASE WHEN
+  (SELECT max_evidence_size_bytes FROM configuration.system_configuration WHERE configuration_id = 1) = 500000
+  AND EXISTS (
+    SELECT 1 FROM emergency.emergency_evidences
+     WHERE evidence_id = '00000000-0000-0000-0000-000000000781'
+       AND file_size_bytes = 1048576
+  )
+  AND EXISTS (
+    SELECT 1 FROM emergency.emergency_evidences
+     WHERE evidence_id = '00000000-0000-0000-0000-000000000782'
+       AND file_size_bytes = 500000
+  )
+  AND EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'ck_emergency_evidences_file_size_bytes_range'
+       AND conrelid = 'emergency.emergency_evidences'::regclass
+       AND NOT convalidated
+  )
+  AND has_table_privilege('alertamujer_app', 'emergency.emergency_evidences', 'INSERT')
+  AND has_table_privilege('alertamujer_app', 'configuration.system_configuration', 'SELECT')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-026 acceptance verification failed: $result"
+  }
+}
+
+function Test-EvidenceLimitRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  (SELECT max_evidence_size_bytes FROM configuration.system_configuration WHERE configuration_id = 1) = 1048576
+  AND EXISTS (
+    SELECT 1 FROM emergency.emergency_evidences
+     WHERE evidence_id = '00000000-0000-0000-0000-000000000781'
+       AND file_size_bytes = 1048576
+  )
+  AND EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'ck_emergency_evidences_file_size_bytes_range'
+       AND conrelid = 'emergency.emergency_evidences'::regclass
+       AND convalidated
+       AND pg_get_constraintdef(oid) LIKE '%1048576%'
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-026 rollback verification failed: $result"
+  }
+}
+
+function Remove-EvidenceLimitLegacyFixture {
+  Invoke-PostgresScalar -Sql @'
+DELETE FROM identity.users
+ WHERE user_id = '00000000-0000-0000-0000-000000000761';
+
+SELECT 'OK';
+'@ | Out-Null
+}
+
 function Test-EmergencyChatMessagesAcceptance {
   $sql = @'
 DO $$
@@ -3070,7 +3197,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-025)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-026)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -3182,6 +3309,14 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-RegistrationRequestOriginTermsFixRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-025)' -Command @('update', '--label-filter=hu-db-025')
   Test-RegistrationRequestOriginTermsFixAcceptance
+  New-EvidenceLimitLegacyFixture
+  Invoke-Liquibase -Phase 'update (HU-DB-026)' -Command @('update', '--label-filter=hu-db-026')
+  Test-EvidenceLimitAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-026)' -Command @('rollback-count', '--count=2')
+  Test-EvidenceLimitRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-026)' -Command @('update', '--label-filter=hu-db-026')
+  Test-EvidenceLimitAcceptance
+  Remove-EvidenceLimitLegacyFixture
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
