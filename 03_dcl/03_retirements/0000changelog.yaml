@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-027-01-remove-fcm-exclusive-storage
+      author: FreinierCardona
+      labels: "hu-db-027,ddl,dcl,notification,breaking"
+      comment: Removes the FCM-only tables, their application privileges, and the empty notification schema under ADR-006.
+      changes:
+        - sqlFile:
+            path: 001_remove_fcm_exclusive_storage.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/03_retirements/001_remove_fcm_exclusive_storage.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
