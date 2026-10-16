@@ -58,6 +58,7 @@ databaseChangeLog:
         - sqlFile:
             path: ../../05_rollbacks/01_ddl/04_alter/004_add_phone_first_registration_flow.rollback.sql
             relativeToChangelogFile: true
+            splitStatements: false
             stripComments: false
   - changeSet:
       id: AM-BD-028-02-allow-phone-simulator-registration-otp

@@ -21,6 +21,13 @@ $environmentOverrides = @{
   POSTGRES_VOLUME_NAME = "$testProject-data"
   POSTGRES_NETWORK_NAME = "$testProject-network"
   POSTGRES_PORT = '0'
+  ADMIN_BOOTSTRAP_ENABLED = 'true'
+  ADMIN_BOOTSTRAP_USERNAME = '@bootstrap_admin'
+  ADMIN_BOOTSTRAP_FIRST_NAMES = 'Bootstrap'
+  ADMIN_BOOTSTRAP_LAST_NAMES = 'Administrator'
+  ADMIN_BOOTSTRAP_EMAIL = 'bootstrap.admin@example.test'
+  ADMIN_BOOTSTRAP_PHONE = '3000000299'
+  ADMIN_BOOTSTRAP_PASSWORD = "Bootstrap!$([Guid]::NewGuid().ToString('N'))9"
 }
 $previousEnvironment = @{}
 
@@ -105,6 +112,53 @@ function Get-SchemaFingerprint {
   }
 
   return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+}
+
+function Invoke-BootstrapAdmin {
+  param([Parameter(Mandatory)][ValidateSet('CREATED', 'UNCHANGED')][string]$ExpectedOutcome)
+
+  $composeErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & docker compose --project-name $testProject up --no-build --abort-on-container-exit `
+      --exit-code-from bootstrap-admin bootstrap-admin 2>&1
+    $bootstrapExitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $composeErrorActionPreference
+  }
+  if ($bootstrapExitCode -ne 0) {
+    throw "Bootstrap service failed with exit code $bootstrapExitCode."
+  }
+
+  Write-Host "Bootstrap phase: $ExpectedOutcome"
+}
+
+function Invoke-BootstrapAdminExpectConflict {
+  $previousUsername = [Environment]::GetEnvironmentVariable('ADMIN_BOOTSTRAP_USERNAME', 'Process')
+  [Environment]::SetEnvironmentVariable('ADMIN_BOOTSTRAP_USERNAME', '@different_admin', 'Process')
+  try {
+    $composeErrorActionPreference = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Continue'
+      $output = & docker compose --project-name $testProject run --rm --no-deps bootstrap-admin 2>&1
+    } finally {
+      $ErrorActionPreference = $composeErrorActionPreference
+    }
+    if ($LASTEXITCODE -eq 0) {
+      throw 'Bootstrap unexpectedly accepted a different ENTITY_ADMIN identity.'
+    }
+
+    if (($output | Out-String) -notmatch 'Bootstrap entity administrator configuration conflicts with existing data\.') {
+      throw 'Bootstrap rejected the different identity without the expected safe conflict result.'
+    }
+  } finally {
+    [Environment]::SetEnvironmentVariable('ADMIN_BOOTSTRAP_USERNAME', $previousUsername, 'Process')
+  }
+}
+
+function Start-PostgresForBootstrapVerification {
+  Invoke-Compose up --detach postgres
+  Wait-ForPostgres
 }
 
 function Test-SystemConfigurationAcceptance {
@@ -3354,6 +3408,128 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Remove-ReleaseEntityAdminFixture {
+  $result = Invoke-PostgresScalar -Sql @'
+DELETE FROM identity.users
+ WHERE user_id = '00000000-0000-0000-0000-000000000018'
+   AND username = 'entity.admin'
+   AND role = 'ENTITY_ADMIN';
+
+SELECT CASE WHEN
+  (SELECT count(*) FROM identity.users WHERE role = 'ENTITY_ADMIN') = 0
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "Bootstrap release fixture cleanup failed: $result"
+  }
+}
+
+function Test-BootstrapAdminAcceptance {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  (SELECT count(*) FROM identity.users WHERE role = 'ENTITY_ADMIN') = 1
+  AND EXISTS (
+    SELECT 1
+      FROM identity.users
+     WHERE username = '@bootstrap_admin'
+       AND first_names = 'Bootstrap'
+       AND last_names = 'Administrator'
+       AND email = 'bootstrap.admin@example.test'
+       AND phone = '3000000299'
+       AND role = 'ENTITY_ADMIN'
+       AND account_status = 'ENABLED'
+       AND account_origin = 'ADMIN_CREATED'
+       AND accepted_terms_at IS NULL
+  )
+  AND (
+    SELECT count(*)
+      FROM identity.user_credentials credentials
+      JOIN identity.users users ON users.user_id = credentials.user_id
+     WHERE users.role = 'ENTITY_ADMIN'
+  ) = 1
+  AND EXISTS (
+    SELECT 1
+      FROM identity.user_credentials credentials
+      JOIN identity.users users ON users.user_id = credentials.user_id
+     WHERE users.role = 'ENTITY_ADMIN'
+       AND credentials.password_hash ~ '^\$2a\$10\$[./A-Za-z0-9]{53}$'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+      FROM identity.user_sessions sessions
+      JOIN identity.users users ON users.user_id = sessions.user_id
+     WHERE users.role = 'ENTITY_ADMIN'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+      FROM identity.user_verification_codes codes
+      JOIN identity.users users ON users.user_id = codes.user_id
+     WHERE users.role = 'ENTITY_ADMIN'
+  )
+  AND EXISTS (
+    SELECT 1
+      FROM pg_extension
+     WHERE extname = 'pgcrypto'
+       AND extnamespace = 'public'::regnamespace
+  )
+  AND (
+    SELECT pg_get_userbyid(proowner) = 'alertamujer_owner'
+      FROM pg_proc
+     WHERE oid = 'identity.bootstrap_entity_admin(text,text,text,text,text,text)'::regprocedure
+  )
+  AND has_function_privilege('alertamujer_app', 'identity.bootstrap_entity_admin(text,text,text,text,text,text)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.bootstrap_entity_admin(text,text,text,text,text,text)', 'EXECUTE')
+  AND NOT has_table_privilege('alertamujer_app', 'identity.user_credentials', 'SELECT')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "Bootstrap administrator acceptance verification failed: $result"
+  }
+}
+
+function Test-BootstrapAdminRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regprocedure('identity.bootstrap_entity_admin(text,text,text,text,text,text)') IS NULL
+  AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto')
+  AND (SELECT count(*) FROM identity.users WHERE role = 'ENTITY_ADMIN') = 1
+  AND (
+    SELECT count(*)
+      FROM identity.user_credentials credentials
+      JOIN identity.users users ON users.user_id = credentials.user_id
+     WHERE users.role = 'ENTITY_ADMIN'
+  ) = 1
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "Bootstrap administrator rollback verification failed: $result"
+  }
+}
+
+function Remove-BootstrapAdminFixture {
+  $result = Invoke-PostgresScalar -Sql @'
+DELETE FROM identity.users
+ WHERE username = '@bootstrap_admin'
+   AND role = 'ENTITY_ADMIN';
+
+SELECT CASE WHEN
+  (SELECT count(*) FROM identity.users WHERE role = 'ENTITY_ADMIN') = 0
+  AND NOT EXISTS (
+    SELECT 1
+      FROM identity.user_credentials credentials
+     WHERE credentials.user_id NOT IN (SELECT user_id FROM identity.users)
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "Bootstrap release fixture cleanup failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -3368,7 +3544,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-026 and HU-DB-028)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026 AND !hu-db-028')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-028 and bootstrap-admin)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026 AND !hu-db-027 AND !hu-db-028 AND !bootstrap-admin')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -3501,6 +3677,26 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-PhoneFirstRegistrationRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-028)' -Command @('update', '--label-filter=hu-db-028')
   Test-PhoneFirstRegistrationAcceptance
+  Invoke-Liquibase -Phase 'update (bootstrap-admin)' -Command @('update', '--label-filter=bootstrap-admin')
+  Remove-ReleaseEntityAdminFixture
+  Invoke-BootstrapAdmin -ExpectedOutcome 'CREATED'
+  Start-PostgresForBootstrapVerification
+  Test-BootstrapAdminAcceptance
+  Invoke-BootstrapAdmin -ExpectedOutcome 'UNCHANGED'
+  Start-PostgresForBootstrapVerification
+  Test-BootstrapAdminAcceptance
+  Invoke-Compose restart postgres
+  Wait-ForPostgres
+  Test-BootstrapAdminAcceptance
+  Invoke-BootstrapAdminExpectConflict
+  Test-BootstrapAdminAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (bootstrap-admin)' -Command @('rollback-count', '--count=3')
+  Test-BootstrapAdminRollback
+  Invoke-Liquibase -Phase 'update (restore bootstrap-admin)' -Command @('update', '--label-filter=bootstrap-admin')
+  Invoke-BootstrapAdmin -ExpectedOutcome 'UNCHANGED'
+  Start-PostgresForBootstrapVerification
+  Test-BootstrapAdminAcceptance
+  Remove-BootstrapAdminFixture
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
