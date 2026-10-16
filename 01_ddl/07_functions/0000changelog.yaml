@@ -29,3 +29,19 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/07_functions/002_create_registration_flow_proof_hash_function.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-029-02-create-bootstrap-entity-admin-function
+      author: FreinierCardona
+      labels: "bootstrap-admin,ddl,identity,security,function"
+      comment: Creates the locked, idempotent development bootstrap for the sole ENTITY_ADMIN account.
+      changes:
+        - sqlFile:
+            path: 003_create_bootstrap_entity_admin_function.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/07_functions/003_create_bootstrap_entity_admin_function.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

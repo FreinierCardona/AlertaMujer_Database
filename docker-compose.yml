@@ -72,6 +72,33 @@ services:
       - --password=${MIGRATOR_DB_PASSWORD:?MIGRATOR_DB_PASSWORD is required in .env}
     command: ["update"]
 
+  bootstrap-admin:
+    image: postgres:17.11-alpine3.24
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      liquibase:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGPORT: ${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      PGUSER: alertamujer_app
+      PGPASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required in .env}
+      ADMIN_BOOTSTRAP_ENABLED: ${ADMIN_BOOTSTRAP_ENABLED:-false}
+      ADMIN_BOOTSTRAP_USERNAME: ${ADMIN_BOOTSTRAP_USERNAME:-}
+      ADMIN_BOOTSTRAP_FIRST_NAMES: ${ADMIN_BOOTSTRAP_FIRST_NAMES:-}
+      ADMIN_BOOTSTRAP_LAST_NAMES: ${ADMIN_BOOTSTRAP_LAST_NAMES:-}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      ADMIN_BOOTSTRAP_PHONE: ${ADMIN_BOOTSTRAP_PHONE:-}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+    volumes:
+      - ./docker/bootstrap-admin.sh:/usr/local/bin/bootstrap-admin:ro
+    networks:
+      - alertamujer_db_network
+    entrypoint: ["/bin/sh", "/usr/local/bin/bootstrap-admin"]
+
 volumes:
   alertamujer_db_data:
     name: ${POSTGRES_VOLUME_NAME:-alertamujer_db_data}

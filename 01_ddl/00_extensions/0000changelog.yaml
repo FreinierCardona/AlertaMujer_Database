@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/00_extensions/001_enable_citext_extension.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-029-01-enable-pgcrypto-extension-for-bootstrap-admin
+      author: FreinierCardona
+      labels: "bootstrap-admin,ddl,identity,security,extension"
+      comment: Enables pgcrypto in public to generate Spring Security compatible BCrypt hashes during the development bootstrap.
+      changes:
+        - sqlFile:
+            path: 002_enable_pgcrypto_extension.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/00_extensions/002_enable_pgcrypto_extension.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
