@@ -299,3 +299,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/03_dcl/01_grants/020_grant_registration_request_origin_terms_read_access.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-028-04-grant-registration-flow-proof-hash-function
+      author: FreinierCardona
+      labels: "hu-db-028,dcl,identity,security,function"
+      comment: Grants the application only the continuation-proof hash lookup needed by v2 registration.
+      changes:
+        - sqlFile:
+            path: 021_grant_registration_flow_proof_hash_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/021_grant_registration_flow_proof_hash_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

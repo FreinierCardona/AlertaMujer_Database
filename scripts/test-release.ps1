@@ -3252,6 +3252,108 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-PhoneFirstRegistrationAcceptance {
+  $sql = @'
+DO $$
+DECLARE
+  created_at_value CONSTANT TIMESTAMPTZ := '2026-10-16 00:00:00+00';
+  request_id CONSTANT UUID := '00000000-0000-0000-0000-000000000028';
+BEGIN
+  INSERT INTO identity.registration_requests (
+    registration_request_id, username, first_names, last_names, email, phone, password_hash,
+    status, expires_at, created_at, updated_at, account_origin, accepted_terms_at,
+    flow_version, registration_stage, flow_secret_hash
+  ) VALUES (
+    request_id, 'phone.first', 'Phone', 'First', NULL, '3000000028', NULL,
+    'PENDING', created_at_value + INTERVAL '1 day', created_at_value, created_at_value,
+    'SELF_REGISTERED', NULL, 'V2', 'PHONE_PENDING', '$2b$12$phone-first-proof-hash'
+  );
+
+  IF identity.get_registration_flow_proof_hash(request_id) <> '$2b$12$phone-first-proof-hash' THEN
+    RAISE EXCEPTION 'HU-DB-028 continuation proof hash function did not return the stored hash.';
+  END IF;
+
+  INSERT INTO identity.user_verification_codes (
+    verification_code_id, registration_request_id, channel, purpose, destination_snapshot,
+    code_hash, expires_at, created_at, updated_at
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000128', request_id, 'PHONE_SIMULATOR',
+    'PHONE_VERIFICATION', '3000000028', '$2b$12$phone-first-code-hash',
+    created_at_value + INTERVAL '1 hour', created_at_value, created_at_value
+  );
+
+  BEGIN
+    UPDATE identity.registration_requests
+       SET registration_stage = 'EMAIL_PENDING'
+     WHERE registration_request_id = request_id;
+    RAISE EXCEPTION 'HU-DB-028 allowed credentials stage before email, password and terms were supplied.';
+  EXCEPTION WHEN check_violation THEN
+    NULL;
+  END;
+
+  UPDATE identity.registration_requests
+     SET registration_stage = 'PHONE_VERIFIED', updated_at = created_at_value + INTERVAL '1 minute'
+   WHERE registration_request_id = request_id;
+
+  UPDATE identity.registration_requests
+     SET email = 'phone.first@example.test',
+         password_hash = '$2b$12$phone-first-password-hash',
+         accepted_terms_at = created_at_value + INTERVAL '2 minutes',
+         registration_stage = 'EMAIL_PENDING',
+         updated_at = created_at_value + INTERVAL '2 minutes'
+   WHERE registration_request_id = request_id;
+
+  DELETE FROM identity.user_verification_codes WHERE registration_request_id = request_id;
+  DELETE FROM identity.registration_requests WHERE registration_request_id = request_id;
+END
+$$;
+
+SELECT CASE WHEN
+  has_column_privilege('alertamujer_app', 'identity.registration_requests', 'flow_version', 'SELECT')
+  AND has_column_privilege('alertamujer_app', 'identity.registration_requests', 'registration_stage', 'SELECT')
+  AND has_function_privilege('alertamujer_app', 'identity.get_registration_flow_proof_hash(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('public', 'identity.get_registration_flow_proof_hash(uuid)', 'EXECUTE')
+  AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_registration_requests_status_stage')
+  AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_user_verification_codes_context_purpose_channel')
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  $result = Invoke-PostgresScalar -Sql $sql
+  if ($result -ne 'OK') {
+    throw "HU-DB-028 acceptance verification failed: $result"
+  }
+}
+
+function Test-PhoneFirstRegistrationRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  to_regprocedure('identity.get_registration_flow_proof_hash(uuid)') IS NULL
+  AND NOT EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'identity'
+       AND table_name = 'registration_requests'
+       AND column_name IN ('flow_version', 'registration_stage', 'flow_secret_hash')
+  )
+  AND NOT EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conname IN (
+       'ck_registration_requests_flow_version',
+       'ck_registration_requests_registration_stage',
+       'ck_registration_requests_status_stage',
+       'ck_registration_requests_v2_flow_secret',
+       'ck_registration_requests_registration_data_by_stage'
+     )
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-028 rollback isolation verification failed: $result"
+  }
+}
+
 try {
   foreach ($name in $environmentOverrides.Keys) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -3266,7 +3368,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-026)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-026 and HU-DB-028)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026 AND !hu-db-028')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -3393,6 +3495,12 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-FcmStorageRemovalRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-027)' -Command @('update', '--label-filter=hu-db-027')
   Test-FcmStorageRemovalAcceptance
+  Invoke-Liquibase -Phase 'update (HU-DB-028)' -Command @('update', '--label-filter=hu-db-028')
+  Test-PhoneFirstRegistrationAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-028)' -Command @('rollback-count', '--count=4')
+  Test-PhoneFirstRegistrationRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-028)' -Command @('update', '--label-filter=hu-db-028')
+  Test-PhoneFirstRegistrationAcceptance
   Invoke-Liquibase -Phase 'history' -Command @('history')
 
   $changeSetCount = [int](Invoke-PostgresScalar -Sql 'SELECT count(*) FROM public.databasechangelog;')
