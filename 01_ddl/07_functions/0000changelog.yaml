@@ -14,3 +14,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/07_functions/001_create_identity_authentication_secret_read_functions.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-028-03-create-registration-flow-proof-hash-function
+      author: FreinierCardona
+      labels: "hu-db-028,ddl,identity,security,function"
+      comment: Exposes only the v2 continuation-proof hash required by the registration service.
+      changes:
+        - sqlFile:
+            path: 002_create_registration_flow_proof_hash_function.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/07_functions/002_create_registration_flow_proof_hash_function.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
