@@ -1,12 +1,19 @@
+-- Representa una invitación y su evolución hacia una relación de contacto.
 CREATE TABLE contacts.emergency_contacts (
-  contact_id          UUID        NOT NULL DEFAULT gen_random_uuid(),
-  owner_user_id       UUID        NOT NULL,
-  contact_user_id     UUID        NOT NULL,
-  relationship_status VARCHAR(8)  NOT NULL DEFAULT 'PENDING',
-  expires_at          TIMESTAMPTZ,
-  status_changed_at   TIMESTAMPTZ,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Distingue a quien envía la invitación de quien la recibe.
+  contact_id           UUID         NOT NULL DEFAULT gen_random_uuid(),
+  owner_user_id        UUID         NOT NULL,
+  contact_user_id      UUID         NOT NULL,
+
+  -- Las fechas obligatorias dependen de si la invitación sigue pendiente o ya cambió de estado.
+  relationship_status  VARCHAR(8)   NOT NULL DEFAULT 'PENDING',
+  expires_at           TIMESTAMPTZ,
+  status_changed_at    TIMESTAMPTZ,
+
+  -- Fechas de creación y última modificación.
+  created_at           TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_emergency_contacts
     PRIMARY KEY (contact_id),

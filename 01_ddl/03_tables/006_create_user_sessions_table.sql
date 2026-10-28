@@ -1,13 +1,20 @@
+-- Conserva sesiones revocables y el hash del token utilizado para renovarlas.
 CREATE TABLE identity.user_sessions (
-  session_id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id             UUID        NOT NULL,
-  refresh_token_hash  VARCHAR(255) NOT NULL,
-  client_type         VARCHAR(9)  NOT NULL,
+
+  -- Identidad de la sesión y cuenta propietaria.
+  session_id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID          NOT NULL,
+
+  -- La unicidad impide compartir el mismo hash entre sesiones.
+  refresh_token_hash  VARCHAR(255)  NOT NULL,
+  client_type         VARCHAR(9)    NOT NULL,
   device_label        TEXT,
-  last_used_at        TIMESTAMPTZ NOT NULL,
-  expires_at          TIMESTAMPTZ NOT NULL,
+
+  -- Último uso, caducidad y revocación; NULL en revoked_at indica que no ha sido revocada.
+  last_used_at        TIMESTAMPTZ   NOT NULL,
+  expires_at          TIMESTAMPTZ   NOT NULL,
   revoked_at          TIMESTAMPTZ,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at          TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_user_sessions_user
     FOREIGN KEY (user_id)

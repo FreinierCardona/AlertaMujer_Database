@@ -1,18 +1,27 @@
+-- Agrupa la configuración operativa en una única fila compartida por los módulos.
 CREATE TABLE configuration.system_configuration (
 
-  configuration_id               SMALLINT     PRIMARY KEY,
-  default_sos_message            VARCHAR(500) NOT NULL,
-  heartbeat_interval_seconds     SMALLINT     NOT NULL,
-  offline_timeout_seconds        SMALLINT     NOT NULL,
-  max_evidence_count             SMALLINT     NOT NULL,
-  max_evidence_size_bytes        INTEGER      NOT NULL,
-  max_chat_message_length        SMALLINT     NOT NULL,
-  otp_ttl_minutes                SMALLINT     NOT NULL,
-  otp_max_attempts               SMALLINT     NOT NULL,
-  otp_max_resends                SMALLINT     NOT NULL,
-  otp_resend_cooldown_minutes    SMALLINT     NOT NULL,
-  created_at                     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at                     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identificador fijo de la configuración; la restricción inferior solo admite el valor 1.
+  configuration_id             SMALLINT      PRIMARY KEY,
+
+  -- Parámetros para alertas, conectividad y contenido adjunto.
+  default_sos_message          VARCHAR(500)  NOT NULL,
+  heartbeat_interval_seconds   SMALLINT      NOT NULL,
+  offline_timeout_seconds      SMALLINT      NOT NULL,
+  max_evidence_count           SMALLINT      NOT NULL,
+  max_evidence_size_bytes      INTEGER       NOT NULL,
+  max_chat_message_length      SMALLINT      NOT NULL,
+
+  -- Vigencia, intentos y reenvíos de códigos de verificación.
+  otp_ttl_minutes              SMALLINT      NOT NULL,
+  otp_max_attempts             SMALLINT      NOT NULL,
+  otp_max_resends              SMALLINT      NOT NULL,
+  otp_resend_cooldown_minutes  SMALLINT      NOT NULL,
+
+  -- Fechas de creación y última modificación.
+  created_at                   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT ck_system_configuration_singleton
     CHECK (configuration_id = 1),
