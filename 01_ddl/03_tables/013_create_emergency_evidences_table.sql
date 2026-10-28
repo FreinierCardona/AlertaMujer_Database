@@ -1,14 +1,23 @@
+-- Registra metadatos de evidencias; el archivo se identifica mediante una referencia privada.
 CREATE TABLE emergency.emergency_evidences (
-  evidence_id         UUID        NOT NULL DEFAULT gen_random_uuid(),
-  emergency_id        UUID        NOT NULL,
-  evidence_sequence   INTEGER     NOT NULL,
-  file_reference      TEXT        NOT NULL,
+
+  -- Identidad y posición de la evidencia dentro de su emergencia.
+  evidence_id         UUID         NOT NULL DEFAULT gen_random_uuid(),
+  emergency_id        UUID         NOT NULL,
+  evidence_sequence   INTEGER      NOT NULL,
+
+  -- Referencia interna única; el nombre original se conserva solo como metadato.
+  file_reference      TEXT         NOT NULL,
   original_file_name  TEXT,
-  mime_type           VARCHAR(10) NOT NULL,
+
+  -- Formato y tamaño del archivo almacenado, separados del formato de origen.
+  mime_type           VARCHAR(10)  NOT NULL,
   original_mime_type  TEXT,
-  file_size_bytes     INTEGER     NOT NULL,
+  file_size_bytes     INTEGER      NOT NULL,
+
+  -- La captura puede desconocerse; la recepción siempre queda registrada.
   captured_at         TIMESTAMPTZ,
-  received_at         TIMESTAMPTZ NOT NULL,
+  received_at         TIMESTAMPTZ  NOT NULL,
 
   CONSTRAINT pk_emergency_evidences
     PRIMARY KEY (evidence_id),

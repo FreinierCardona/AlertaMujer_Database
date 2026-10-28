@@ -1,3 +1,4 @@
+-- Lee el hash de la cuenta con permisos del propietario y una ruta de búsqueda explícita.
 CREATE FUNCTION identity.get_user_password_hash(p_user_id UUID)
 RETURNS VARCHAR
 LANGUAGE sql
@@ -6,6 +7,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, identity
 AS 'SELECT password_hash FROM identity.user_credentials WHERE user_id = $1';
 
+-- Permite comprobar la contraseña del registro sin otorgar lectura directa de la columna.
 CREATE FUNCTION identity.get_registration_password_hash(p_registration_request_id UUID)
 RETURNS VARCHAR
 LANGUAGE sql
@@ -14,6 +16,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, identity
 AS 'SELECT password_hash FROM identity.registration_requests WHERE registration_request_id = $1';
 
+-- Devuelve el hash de un código concreto para validar la prueba presentada por el usuario.
 CREATE FUNCTION identity.get_verification_code_hash(p_verification_code_id UUID)
 RETURNS VARCHAR
 LANGUAGE sql
@@ -22,6 +25,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, identity
 AS 'SELECT code_hash FROM identity.user_verification_codes WHERE verification_code_id = $1';
 
+-- Devuelve el hash del token de una sesión para verificar su renovación.
 CREATE FUNCTION identity.get_user_session_refresh_token_hash(p_session_id UUID)
 RETURNS VARCHAR
 LANGUAGE sql
@@ -30,6 +34,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, identity
 AS 'SELECT refresh_token_hash FROM identity.user_sessions WHERE session_id = $1';
 
+-- Retira el acceso implícito de PUBLIC; los permisos de ejecución se conceden en las migraciones DCL.
 REVOKE ALL ON FUNCTION identity.get_user_password_hash(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity.get_registration_password_hash(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION identity.get_verification_code_hash(UUID) FROM PUBLIC;

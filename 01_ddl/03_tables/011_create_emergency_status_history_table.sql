@@ -1,13 +1,22 @@
+-- Registra las transiciones de estado con una secuencia única dentro de cada emergencia.
 CREATE TABLE emergency.emergency_status_history (
-  emergency_status_history_id UUID        NOT NULL DEFAULT gen_random_uuid(),
-  emergency_id                UUID        NOT NULL,
-  sequence_no                 INTEGER     NOT NULL,
-  previous_status             VARCHAR(11),
-  new_status                  VARCHAR(11) NOT NULL,
-  actor_user_id               UUID,
-  cause                       TEXT,
-  occurred_at                 TIMESTAMPTZ NOT NULL,
-  created_at                  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identidad del evento y orden dentro del historial de la emergencia.
+  emergency_status_history_id  UUID         NOT NULL DEFAULT gen_random_uuid(),
+  emergency_id                 UUID         NOT NULL,
+  sequence_no                  INTEGER      NOT NULL,
+
+  -- La primera transición parte de NULL y termina en ACTIVE.
+  previous_status              VARCHAR(11),
+  new_status                   VARCHAR(11)  NOT NULL,
+
+  -- El actor puede estar ausente en transiciones automáticas.
+  actor_user_id                UUID,
+  cause                        TEXT,
+
+  -- Distingue cuándo ocurrió la transición de cuándo se creó el registro.
+  occurred_at                  TIMESTAMPTZ  NOT NULL,
+  created_at                   TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_emergency_status_history
     PRIMARY KEY (emergency_status_history_id),

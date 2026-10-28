@@ -1,10 +1,17 @@
+-- Almacena mensajes de emergencia con identificadores para ordenación e idempotencia.
 CREATE TABLE emergency.emergency_chat_messages (
-  chat_message_id   BIGINT       GENERATED ALWAYS AS IDENTITY,
-  client_message_id UUID         NOT NULL,
-  emergency_id      UUID         NOT NULL,
-  sender_user_id    UUID         NOT NULL,
-  content           VARCHAR(500) NOT NULL,
-  sent_at           TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identificador persistido secuencial usado como cursor de lectura.
+  chat_message_id    BIGINT        GENERATED ALWAYS AS IDENTITY,
+
+  -- Identificador del cliente; su unicidad por emergencia evita duplicar reintentos.
+  client_message_id  UUID          NOT NULL,
+  emergency_id       UUID          NOT NULL,
+  sender_user_id     UUID          NOT NULL,
+
+  -- Texto enviado y fecha asignada al mensaje.
+  content            VARCHAR(500)  NOT NULL,
+  sent_at            TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_emergency_chat_messages
     PRIMARY KEY (chat_message_id),

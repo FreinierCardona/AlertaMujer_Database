@@ -1,19 +1,30 @@
+-- Almacena códigos de verificación protegidos y sus límites de uso.
 CREATE TABLE identity.user_verification_codes (
-  verification_code_id     UUID         NOT NULL DEFAULT gen_random_uuid(),
+
+  -- El código pertenece a una cuenta o a una solicitud; la restricción XOR exige exactamente una.
+  verification_code_id     UUID          NOT NULL DEFAULT gen_random_uuid(),
   user_id                  UUID,
   registration_request_id  UUID,
-  channel                  VARCHAR(5)   NOT NULL,
-  purpose                  VARCHAR(22)  NOT NULL,
-  destination_snapshot     VARCHAR(255) NOT NULL,
-  code_hash                VARCHAR(255) NOT NULL,
-  expires_at               TIMESTAMPTZ  NOT NULL,
+
+  -- Canal, propósito y destino conservado al emitir el código.
+  channel                  VARCHAR(5)    NOT NULL,
+  purpose                  VARCHAR(22)   NOT NULL,
+  destination_snapshot     VARCHAR(255)  NOT NULL,
+
+  -- Hash del código y fechas que determinan si todavía puede utilizarse.
+  code_hash                VARCHAR(255)  NOT NULL,
+  expires_at               TIMESTAMPTZ   NOT NULL,
   used_at                  TIMESTAMPTZ,
   invalidated_at           TIMESTAMPTZ,
-  attempt_count            INTEGER      NOT NULL DEFAULT 0,
-  max_attempts             INTEGER      NOT NULL DEFAULT 5,
-  resend_number            INTEGER      NOT NULL DEFAULT 0,
-  created_at               TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at               TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Contadores de validación y reenvío, limitados por las restricciones inferiores.
+  attempt_count            INTEGER       NOT NULL DEFAULT 0,
+  max_attempts             INTEGER       NOT NULL DEFAULT 5,
+  resend_number            INTEGER       NOT NULL DEFAULT 0,
+
+  -- Trazabilidad temporal del registro.
+  created_at               TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at               TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_user_verification_codes
     PRIMARY KEY (verification_code_id),

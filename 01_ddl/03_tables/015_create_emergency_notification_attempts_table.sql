@@ -1,18 +1,19 @@
+-- Define el historial de envíos FCM, retirado posteriormente por la migración de retiro.
 CREATE TABLE notification.emergency_notification_attempts (
-  -- Identity and associations
-  notification_attempt_id UUID        NOT NULL DEFAULT gen_random_uuid(),
-  emergency_id            UUID        NOT NULL,
-  contact_user_id         UUID        NOT NULL,
-  device_token_id         UUID,
+  -- Identidad y relaciones con emergencia, contacto y dispositivo.
+  notification_attempt_id  UUID         NOT NULL DEFAULT gen_random_uuid(),
+  emergency_id             UUID         NOT NULL,
+  contact_user_id          UUID         NOT NULL,
+  device_token_id          UUID,
 
-  -- Provider result
-  result_status           VARCHAR(13) NOT NULL DEFAULT 'PENDING',
-  provider_message_id     TEXT,
-  error_code              TEXT,
+  -- Resultado reportado por el proveedor.
+  result_status            VARCHAR(13)  NOT NULL DEFAULT 'PENDING',
+  provider_message_id      TEXT,
+  error_code               TEXT,
 
-  -- Traceability timestamps
-  attempted_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Fechas de trazabilidad del intento.
+  attempted_at             TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at               TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_emergency_notification_attempts
     PRIMARY KEY (notification_attempt_id),

@@ -1,11 +1,11 @@
--- HU-DB-027 / ADR-006: FCM data is intentionally removed with these tables.
--- This change is scheduled only with a Backend that no longer reads or writes
--- notification.*. It does not affect the emergency/contact source of truth.
+-- HU-DB-027 / ADR-006: los datos FCM se eliminan intencionalmente junto con estas tablas.
+-- Este cambio se programa solo con una versión de Backend que ya no lea ni escriba en
+-- notification.*. No afecta a la fuente de verdad de emergencias y contactos.
 --
--- The attempt table owns the foreign key to the device-token table. Dropping a
--- table removes its table-specific privileges and indexes.
+-- La tabla de intentos contiene la clave foránea hacia la tabla de tokens de dispositivo. Eliminar una
+-- tabla elimina sus permisos e índices específicos.
 DROP TABLE IF EXISTS notification.emergency_notification_attempts;
 DROP TABLE IF EXISTS notification.user_device_tokens;
 
--- Do not use CASCADE: the schema must be empty after removing FCM-only objects.
+-- No usar CASCADE: el esquema debe quedar vacío tras retirar los objetos exclusivos de FCM.
 DROP SCHEMA IF EXISTS notification;
