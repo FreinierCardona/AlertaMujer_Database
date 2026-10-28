@@ -1,9 +1,16 @@
+-- Guarda el mensaje SOS personalizado, con una sola preferencia por usuario.
 CREATE TABLE profile.user_emergency_settings (
-  setting_id                UUID         NOT NULL DEFAULT gen_random_uuid(),
-  user_id                   UUID         NOT NULL,
-  default_emergency_message VARCHAR(500),
-  created_at                TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at                TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identidad de la preferencia y vínculo con su cuenta.
+  setting_id                 UUID          NOT NULL DEFAULT gen_random_uuid(),
+  user_id                    UUID          NOT NULL,
+
+  -- NULL permite usar el mensaje por defecto; un texto presente no puede estar vacío.
+  default_emergency_message  VARCHAR(500),
+
+  -- Fechas de creación y última modificación.
+  created_at                 TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                 TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_user_emergency_settings
     PRIMARY KEY (setting_id),

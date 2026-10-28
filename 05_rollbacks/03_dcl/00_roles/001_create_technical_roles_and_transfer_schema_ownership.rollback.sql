@@ -1,2 +1,2 @@
--- Technical roles, membership, and ownership remain bootstrap infrastructure.
--- Their credentials stay outside Liquibase so rollback followed by update can reconnect safely.
+-- Los roles técnicos, sus membresías y la propiedad siguen siendo infraestructura de inicialización.
+-- Sus credenciales permanecen fuera de Liquibase para poder reconectar después de revertir y volver a aplicar los cambios.

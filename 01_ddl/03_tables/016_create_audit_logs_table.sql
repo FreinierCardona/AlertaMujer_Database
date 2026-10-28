@@ -1,16 +1,25 @@
+-- Registra acciones auditables con actor, sujeto afectado y estado anterior y posterior.
 CREATE TABLE audit.audit_logs (
-  audit_log_id    UUID        NOT NULL DEFAULT gen_random_uuid(),
-  actor_user_id   UUID,
-  subject_user_id UUID,
-  action          VARCHAR(22) NOT NULL,
-  entity_type     TEXT        NOT NULL,
-  entity_id       UUID        NOT NULL,
-  result          VARCHAR(7)  NOT NULL,
-  previous_state  JSONB,
-  new_state       JSONB,
-  description     VARCHAR(500),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at      TIMESTAMPTZ,
+
+  -- El actor ejecuta la acción; el sujeto identifica la cuenta afectada cuando corresponde.
+  audit_log_id     UUID          NOT NULL DEFAULT gen_random_uuid(),
+  actor_user_id    UUID,
+  subject_user_id  UUID,
+
+  -- Acción, entidad afectada y resultado de la operación.
+  action           VARCHAR(22)   NOT NULL,
+  entity_type      TEXT          NOT NULL,
+  entity_id        UUID          NOT NULL,
+  result           VARCHAR(7)    NOT NULL,
+
+  -- Instantáneas JSON opcionales; si existen, deben ser objetos.
+  previous_state   JSONB,
+  new_state        JSONB,
+  description      VARCHAR(500),
+
+  -- Fechas para la trazabilidad y posible caducidad del registro.
+  created_at       TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at       TIMESTAMPTZ,
 
   CONSTRAINT pk_audit_logs
     PRIMARY KEY (audit_log_id),

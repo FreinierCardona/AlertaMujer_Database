@@ -1,4 +1,4 @@
--- Structural rollback only. Historical FCM rows removed by HU-DB-027 are not restored.
+-- Reversión exclusivamente estructural. No se restauran las filas históricas FCM eliminadas por HU-DB-027.
 CREATE SCHEMA notification AUTHORIZATION alertamujer_owner;
 REVOKE ALL ON SCHEMA notification FROM PUBLIC;
 GRANT USAGE ON SCHEMA notification TO alertamujer_app;

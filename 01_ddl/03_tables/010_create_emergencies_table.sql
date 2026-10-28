@@ -1,14 +1,23 @@
+-- Mantiene el estado actual de cada emergencia y el mensaje capturado al iniciarla.
 CREATE TABLE emergency.emergencies (
-  emergency_id               UUID         NOT NULL DEFAULT gen_random_uuid(),
-  user_id                    UUID         NOT NULL,
-  status                     VARCHAR(11)  NOT NULL DEFAULT 'ACTIVE',
-  previous_operational_status VARCHAR(11),
-  last_heartbeat_at          TIMESTAMPTZ,
-  message_snapshot           VARCHAR(500) NOT NULL,
-  started_at                 TIMESTAMPTZ  NOT NULL,
-  finalized_at               TIMESTAMPTZ,
-  created_at                 TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at                 TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identidad de la emergencia y cuenta que la originó.
+  emergency_id                 UUID          NOT NULL DEFAULT gen_random_uuid(),
+  user_id                      UUID          NOT NULL,
+
+  -- Estado actual y datos para recuperar el estado operativo tras una desconexión.
+  status                       VARCHAR(11)   NOT NULL DEFAULT 'ACTIVE',
+  previous_operational_status  VARCHAR(11),
+  last_heartbeat_at            TIMESTAMPTZ,
+
+  -- Copia del mensaje SOS: conserva el texto aunque luego cambien las preferencias.
+  message_snapshot             VARCHAR(500)  NOT NULL,
+
+  -- Fechas del ciclo de vida; finalized_at solo existe en estado FINALIZED.
+  started_at                   TIMESTAMPTZ   NOT NULL,
+  finalized_at                 TIMESTAMPTZ,
+  created_at                   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                   TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_emergencies
     PRIMARY KEY (emergency_id),

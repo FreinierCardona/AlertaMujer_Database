@@ -1,3 +1,4 @@
+-- Crea el administrador de forma atómica; devuelve CREATED o UNCHANGED si coincide con el existente.
 CREATE FUNCTION identity.bootstrap_entity_admin(
   p_username    TEXT,
   p_first_names TEXT,
@@ -11,6 +12,7 @@ LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, identity
+-- El cuerpo valida datos y usa un bloqueo transaccional para serializar inicializaciones concurrentes.
 AS $bootstrap$
 DECLARE
   existing_admin         identity.users%ROWTYPE;
@@ -135,4 +137,5 @@ BEGIN
 END;
 $bootstrap$;
 
+-- Restringe la ejecución a los roles autorizados mediante permisos explícitos.
 REVOKE ALL ON FUNCTION identity.bootstrap_entity_admin(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;

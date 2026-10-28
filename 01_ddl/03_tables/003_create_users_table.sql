@@ -1,19 +1,26 @@
+-- Define la identidad de cuenta, sus datos de contacto y su estado de acceso.
 CREATE TABLE identity.users (
-  user_id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  username          CITEXT       NOT NULL UNIQUE,
-  first_names       VARCHAR(100) NOT NULL,
-  last_names        VARCHAR(100) NOT NULL,
-  email             CITEXT       NOT NULL UNIQUE,
-  phone             VARCHAR(20)  NOT NULL UNIQUE,
-  role              VARCHAR(20)  NOT NULL,
-  account_status    VARCHAR(10)  NOT NULL,
-  account_origin    VARCHAR(20)  NOT NULL,
-  accepted_terms_at TIMESTAMPTZ,
-  last_login_at     TIMESTAMPTZ,
-  last_activity_at  TIMESTAMPTZ,
-  disabled_at       TIMESTAMPTZ,
-  created_at        TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identidad y datos personales; CITEXT compara sin distinguir mayúsculas.
+  user_id            UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  username           CITEXT        NOT NULL UNIQUE,
+  first_names        VARCHAR(100)  NOT NULL,
+  last_names         VARCHAR(100)  NOT NULL,
+  email              CITEXT        NOT NULL UNIQUE,
+  phone              VARCHAR(20)   NOT NULL UNIQUE,
+
+  -- Rol, habilitación y origen de la cuenta.
+  role               VARCHAR(20)   NOT NULL,
+  account_status     VARCHAR(10)   NOT NULL,
+  account_origin     VARCHAR(20)   NOT NULL,
+
+  -- Aceptación de términos y fechas del ciclo de vida de la cuenta.
+  accepted_terms_at  TIMESTAMPTZ,
+  last_login_at      TIMESTAMPTZ,
+  last_activity_at   TIMESTAMPTZ,
+  disabled_at        TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT ck_users_username_not_blank
     CHECK (btrim(username::TEXT) <> ''),

@@ -101,8 +101,8 @@ function Get-SchemaFingerprint {
     throw 'Could not calculate the schema fingerprint.'
   }
 
-  # PostgreSQL 17 adds a random psql \restrict token to each dump. It is not
-  # part of the schema, so omit it before comparing two schema-only dumps.
+  # PostgreSQL 17 agrega un token aleatorio psql \restrict a cada volcado. No forma
+  # parte del esquema, por lo que se omite antes de comparar dos volcados de solo esquema.
   $schemaText = ($dump | Where-Object { $_ -notmatch '^\\(?:un)?restrict ' }) -join "`n"
   $hash = [Security.Cryptography.SHA256]::Create()
   try {

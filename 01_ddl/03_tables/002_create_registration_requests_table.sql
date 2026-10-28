@@ -1,15 +1,22 @@
+-- Conserva solicitudes temporales de registro antes de crear la cuenta definitiva.
 CREATE TABLE identity.registration_requests (
-  registration_request_id UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  username                CITEXT       NOT NULL,
-  first_names             VARCHAR(100) NOT NULL,
-  last_names              VARCHAR(100) NOT NULL,
-  email                   CITEXT       NOT NULL,
-  phone                   VARCHAR(20)  NOT NULL,
-  password_hash           VARCHAR(255) NOT NULL,
-  status                  VARCHAR(10)  NOT NULL DEFAULT 'PENDING',
-  expires_at              TIMESTAMPTZ  NOT NULL,
-  created_at              TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at              TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Identidad de la solicitud y datos declarados por la persona.
+  registration_request_id  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  username                 CITEXT        NOT NULL,
+  first_names              VARCHAR(100)  NOT NULL,
+  last_names               VARCHAR(100)  NOT NULL,
+  email                    CITEXT        NOT NULL,
+  phone                    VARCHAR(20)   NOT NULL,
+
+  -- Credencial protegida; este campo no contiene la contraseña en texto plano.
+  password_hash            VARCHAR(255)  NOT NULL,
+
+  -- Estado del proceso y fechas que limitan su vigencia.
+  status                   VARCHAR(10)   NOT NULL DEFAULT 'PENDING',
+  expires_at               TIMESTAMPTZ   NOT NULL,
+  created_at               TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at               TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT ck_registration_requests_username_not_blank
     CHECK (btrim(username::TEXT) <> ''),

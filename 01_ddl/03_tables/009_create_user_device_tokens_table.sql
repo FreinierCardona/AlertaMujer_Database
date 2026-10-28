@@ -1,14 +1,21 @@
+-- Define el almacenamiento histórico de tokens FCM, retirado posteriormente por la migración de retiro.
 CREATE TABLE notification.user_device_tokens (
-  device_token_id UUID        NOT NULL DEFAULT gen_random_uuid(),
-  user_id         UUID        NOT NULL,
-  fcm_token       TEXT        NOT NULL,
-  platform        VARCHAR(7)  NOT NULL,
-  device_label    TEXT,
-  is_active       BOOLEAN     NOT NULL,
-  last_seen_at    TIMESTAMPTZ,
-  invalidated_at  TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  -- Asocia el dispositivo con su usuario y token del proveedor.
+  device_token_id  UUID         NOT NULL DEFAULT gen_random_uuid(),
+  user_id          UUID         NOT NULL,
+  fcm_token        TEXT         NOT NULL,
+  platform         VARCHAR(7)   NOT NULL,
+  device_label     TEXT,
+
+  -- La invalidación debe acompañar a todo token marcado como inactivo.
+  is_active        BOOLEAN      NOT NULL,
+  last_seen_at     TIMESTAMPTZ,
+  invalidated_at   TIMESTAMPTZ,
+
+  -- Fechas de creación y última modificación.
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT pk_user_device_tokens
     PRIMARY KEY (device_token_id),
