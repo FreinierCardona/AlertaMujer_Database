@@ -75,3 +75,18 @@ databaseChangeLog:
             path: ../../05_rollbacks/01_ddl/04_alter/005_allow_phone_simulator_registration_otp.rollback.sql
             relativeToChangelogFile: true
             stripComments: false
+  - changeSet:
+      id: AM-BD-030-01-allow-unbounded-automatic-evidence-sequence
+      author: FreinierCardona
+      labels: "hu-db-030,ddl,emergency,evidence"
+      comment: Allows periodic evidence capture while an emergency remains open.
+      changes:
+        - sqlFile:
+            path: 006_allow_unbounded_automatic_evidence_sequence.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/006_allow_unbounded_automatic_evidence_sequence.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
