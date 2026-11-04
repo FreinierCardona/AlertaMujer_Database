@@ -2422,6 +2422,64 @@ THEN 'OK' ELSE 'FAILED' END;
   }
 }
 
+function Test-UnboundedAutomaticEvidenceAcceptance {
+  $result = Invoke-PostgresScalar -Sql @'
+BEGIN;
+DELETE FROM emergency.emergency_evidences
+ WHERE evidence_id = '00000000-0000-0000-0000-000000000784';
+
+SET LOCAL ROLE alertamujer_app;
+INSERT INTO emergency.emergency_evidences (
+  evidence_id, emergency_id, evidence_sequence, file_reference, mime_type,
+  file_size_bytes, received_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000784', '00000000-0000-0000-0000-000000000771',
+  11, 'evidence-periodic-784', 'image/webp', 500000, '2026-10-14 00:03:00+00'
+);
+RESET ROLE;
+COMMIT;
+
+SELECT CASE WHEN
+  (SELECT max_evidence_count FROM configuration.system_configuration WHERE configuration_id = 1) = 0
+  AND EXISTS (
+    SELECT 1 FROM emergency.emergency_evidences
+     WHERE evidence_id = '00000000-0000-0000-0000-000000000784'
+       AND evidence_sequence = 11
+  )
+  AND EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'ck_emergency_evidences_sequence_range'
+       AND conrelid = 'emergency.emergency_evidences'::regclass
+       AND convalidated
+       AND pg_get_constraintdef(oid) LIKE '%evidence_sequence >= 1%'
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-030 acceptance verification failed: $result"
+  }
+}
+
+function Test-UnboundedAutomaticEvidenceRollback {
+  $result = Invoke-PostgresScalar -Sql @'
+SELECT CASE WHEN
+  (SELECT max_evidence_count FROM configuration.system_configuration WHERE configuration_id = 1) = 10
+  AND EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'ck_emergency_evidences_sequence_range'
+       AND conrelid = 'emergency.emergency_evidences'::regclass
+       AND NOT convalidated
+       AND pg_get_constraintdef(oid) LIKE '%BETWEEN 1 AND 10%'
+  )
+THEN 'OK' ELSE 'FAILED' END;
+'@
+
+  if ($result -ne 'OK') {
+    throw "HU-DB-030 rollback verification failed: $result"
+  }
+}
+
 function Remove-EvidenceLimitLegacyFixture {
   Invoke-PostgresScalar -Sql @'
 DELETE FROM identity.users
@@ -3544,7 +3602,7 @@ try {
   Invoke-Liquibase -Phase 'validate' -Command @('validate')
   Invoke-Liquibase -Phase 'status (clean database)' -Command @('status', '--verbose')
   Invoke-Liquibase -Phase 'update-sql' -Command @('update-sql')
-  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-028 and bootstrap-admin)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026 AND !hu-db-027 AND !hu-db-028 AND !bootstrap-admin')
+  Invoke-Liquibase -Phase 'update (baseline without HU-DB-009 through HU-DB-030 and bootstrap-admin)' -Command @('update', '--label-filter=!hu-db-009 AND !hu-db-010 AND !hu-db-011 AND !hu-db-012 AND !hu-db-013 AND !hu-db-014 AND !hu-db-015 AND !hu-db-016 AND !hu-db-017 AND !hu-db-018 AND !hu-db-019 AND !hu-db-020 AND !hu-db-021 AND !hu-db-022 AND !hu-db-023 AND !hu-db-024 AND !hu-db-025 AND !hu-db-026 AND !hu-db-027 AND !hu-db-028 AND !hu-db-030 AND !bootstrap-admin')
   Test-SystemConfigurationAcceptance
   Invoke-Liquibase -Phase 'update (HU-DB-009)' -Command @('update', '--label-filter=hu-db-009')
   Test-RegistrationRequestsAcceptance
@@ -3677,6 +3735,14 @@ THEN 'OK' ELSE 'FAILED' END;
   Test-PhoneFirstRegistrationRollback
   Invoke-Liquibase -Phase 'update (restore HU-DB-028)' -Command @('update', '--label-filter=hu-db-028')
   Test-PhoneFirstRegistrationAcceptance
+  New-EvidenceLimitLegacyFixture
+  Invoke-Liquibase -Phase 'update (HU-DB-030)' -Command @('update', '--label-filter=hu-db-030')
+  Test-UnboundedAutomaticEvidenceAcceptance
+  Invoke-Liquibase -Phase 'rollback-count (HU-DB-030)' -Command @('rollback-count', '--count=2')
+  Test-UnboundedAutomaticEvidenceRollback
+  Invoke-Liquibase -Phase 'update (restore HU-DB-030)' -Command @('update', '--label-filter=hu-db-030')
+  Test-UnboundedAutomaticEvidenceAcceptance
+  Remove-EvidenceLimitLegacyFixture
   Invoke-Liquibase -Phase 'update (bootstrap-admin)' -Command @('update', '--label-filter=bootstrap-admin')
   Remove-ReleaseEntityAdminFixture
   Invoke-BootstrapAdmin -ExpectedOutcome 'CREATED'
