@@ -1,0 +1,92 @@
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-024-01-restrict-verification-code-context-purpose-channel
+      author: FreinierCardona
+      labels: "hu-db-024,ddl,identity,security"
+      comment: Restricts OTP purposes and channels to their documented identity contexts.
+      changes:
+        - sqlFile:
+            path: 001_add_verification_codes_context_purpose_channel_check.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/001_add_verification_codes_context_purpose_channel_check.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-025-01-add-registration-request-origin-and-terms
+      author: FreinierCardona
+      labels: "hu-db-025,ddl,identity,fix"
+      comment: Persists account origin and terms acceptance on pending registration requests.
+      changes:
+        - sqlFile:
+            path: 002_add_registration_request_origin_and_terms.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/002_add_registration_request_origin_and_terms.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-026-01-reduce-evidence-metadata-size-limit
+      author: FreinierCardona
+      labels: "hu-db-026,ddl,emergency,evidence"
+      comment: Enforces the 500000-byte WebP metadata limit for new evidence while retaining legacy metadata.
+      changes:
+        - sqlFile:
+            path: 003_reduce_evidence_metadata_size_limit.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/003_reduce_evidence_metadata_size_limit.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-028-01-add-phone-first-registration-flow
+      author: FreinierCardona
+      labels: "hu-db-028,ddl,identity,registration"
+      comment: Adds the temporary v2 phone-first registration stages and continuation-proof hash.
+      changes:
+        - sqlFile:
+            path: 004_add_phone_first_registration_flow.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/004_add_phone_first_registration_flow.rollback.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            stripComments: false
+  - changeSet:
+      id: AM-BD-028-02-allow-phone-simulator-registration-otp
+      author: FreinierCardona
+      labels: "hu-db-028,ddl,identity,otp"
+      comment: Adds the simulated-phone registration channel without changing legacy SMS rows.
+      changes:
+        - sqlFile:
+            path: 005_allow_phone_simulator_registration_otp.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/005_allow_phone_simulator_registration_otp.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-030-01-allow-unbounded-automatic-evidence-sequence
+      author: FreinierCardona
+      labels: "hu-db-030,ddl,emergency,evidence"
+      comment: Allows periodic evidence capture while an emergency remains open.
+      changes:
+        - sqlFile:
+            path: 006_allow_unbounded_automatic_evidence_sequence.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/04_alter/006_allow_unbounded_automatic_evidence_sequence.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

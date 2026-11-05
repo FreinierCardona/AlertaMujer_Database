@@ -1,0 +1,1 @@
+DROP INDEX identity.ux_users_single_entity_admin;

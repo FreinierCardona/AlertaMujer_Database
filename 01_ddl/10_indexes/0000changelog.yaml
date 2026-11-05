@@ -1,0 +1,196 @@
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-009-02-create-registration-requests-pending-identity-indexes
+      author: FreinierCardona
+      labels: "hu-db-009,ddl,identity,index"
+      comment: Prevents duplicate normalized identities while their registration requests are pending.
+      changes:
+        - sqlFile:
+            path: 001_create_registration_requests_pending_identity_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/001_create_registration_requests_pending_identity_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-010-02-create-users-single-entity-admin-index
+      author: FreinierCardona
+      labels: "hu-db-010,ddl,identity,index"
+      comment: Enforces the single ENTITY_ADMIN account permitted by the model.
+      changes:
+        - sqlFile:
+            path: 002_create_users_single_entity_admin_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/002_create_users_single_entity_admin_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-012-02-create-user-verification-codes-context-indexes
+      author: FreinierCardona
+      labels: "hu-db-012,ddl,identity,index"
+      comment: Indexes OTP context lookups and scheduled expiration purges.
+      changes:
+        - sqlFile:
+            path: 003_create_user_verification_codes_context_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/003_create_user_verification_codes_context_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-013-02-create-user-sessions-current-indexes
+      author: FreinierCardona
+      labels: "hu-db-013,ddl,identity,index"
+      comment: Indexes per-account revocation and scheduled session-expiration lookups.
+      changes:
+        - sqlFile:
+            path: 004_create_user_sessions_current_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/004_create_user_sessions_current_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-015-02-create-emergency-contacts-indexes
+      author: FreinierCardona
+      labels: "hu-db-015,ddl,contacts,index"
+      comment: Enforces canonical contact pairs and indexes each participant role.
+      changes:
+        - sqlFile:
+            path: 005_create_emergency_contacts_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/005_create_emergency_contacts_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-016-02-create-user-device-tokens-active-recent-index
+      author: FreinierCardona
+      labels: "hu-db-016,ddl,notification,index"
+      comment: Indexes active tokens for the documented most-recent Android FCM selection.
+      changes:
+        - sqlFile:
+            path: 006_create_user_device_tokens_active_recent_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/006_create_user_device_tokens_active_recent_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-017-02-create-emergencies-indexes
+      author: FreinierCardona
+      labels: "hu-db-017,ddl,emergency,index"
+      comment: Enforces one open SOS per user and supports per-user emergency history lookups.
+      changes:
+        - sqlFile:
+            path: 007_create_emergencies_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/007_create_emergencies_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-018-02-create-emergency-status-history-indexes
+      author: FreinierCardona
+      labels: "hu-db-018,ddl,emergency,index"
+      comment: Indexes stable per-emergency history reconstruction by occurrence and sequence.
+      changes:
+        - sqlFile:
+            path: 008_create_emergency_status_history_indexes.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/008_create_emergency_status_history_indexes.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-019-02-create-emergency-locations-latest-index
+      author: FreinierCardona
+      labels: "hu-db-019,ddl,emergency,index"
+      comment: Indexes confirmed emergency locations for latest-position queries.
+      changes:
+        - sqlFile:
+            path: 009_create_emergency_locations_latest_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/009_create_emergency_locations_latest_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-020-02-create-emergency-evidences-received-index
+      author: FreinierCardona
+      labels: "hu-db-020,ddl,emergency,index"
+      comment: Indexes emergency evidence retrieval in confirmed receipt order.
+      changes:
+        - sqlFile:
+            path: 010_create_emergency_evidences_received_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/010_create_emergency_evidences_received_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-021-02-create-emergency-chat-messages-order-index
+      author: FreinierCardona
+      labels: "hu-db-021,ddl,emergency,index"
+      comment: Indexes per-emergency chat retrieval in server-time and stable identifier order.
+      changes:
+        - sqlFile:
+            path: 011_create_emergency_chat_messages_order_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/011_create_emergency_chat_messages_order_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-022-02-create-emergency-notification-attempts-contact-index
+      author: FreinierCardona
+      labels: "hu-db-022,ddl,notification,index"
+      comment: Indexes notification-attempt retrieval for each contacted account.
+      changes:
+        - sqlFile:
+            path: 012_create_emergency_notification_attempts_contact_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/012_create_emergency_notification_attempts_contact_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-023-02-create-audit-logs-entity-created-index
+      author: FreinierCardona
+      labels: "hu-db-023,ddl,audit,index"
+      comment: Indexes audit-event retrieval for a logical target in event order.
+      changes:
+        - sqlFile:
+            path: 013_create_audit_logs_entity_created_index.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/10_indexes/013_create_audit_logs_entity_created_index.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

@@ -1,0 +1,2 @@
+-- Los roles técnicos, sus membresías y la propiedad siguen siendo infraestructura de inicialización.
+-- Sus credenciales permanecen fuera de Liquibase para poder reconectar después de revertir y volver a aplicar los cambios.

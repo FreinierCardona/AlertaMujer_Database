@@ -1,0 +1,1 @@
+DROP INDEX notification.ix_user_device_tokens_active_recent;

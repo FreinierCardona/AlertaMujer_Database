@@ -1,0 +1,1 @@
+DROP INDEX emergency.ix_emergency_status_history_emergency_occurred_sequence;

@@ -1,0 +1,331 @@
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-006-02-configure-minimum-application-privileges
+      author: FreinierCardona
+      labels: "hu-db-006,dcl,grants,security"
+      comment: Applies schema access and default privileges for the application role.
+      changes:
+        - sqlFile:
+            path: 001_configure_minimum_application_privileges.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/001_configure_minimum_application_privileges.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-008-03-grant-system-configuration-read-access
+      author: FreinierCardona
+      labels: "hu-db-008,dcl,configuration,security"
+      comment: Grants the application read-only access to the global configuration singleton.
+      changes:
+        - sqlFile:
+            path: 002_grant_system_configuration_read_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/002_grant_system_configuration_read_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-009-03-grant-registration-request-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-009,dcl,identity,security"
+      comment: Grants registration workflow access without exposing pending password hashes for reads.
+      changes:
+        - sqlFile:
+            path: 003_grant_registration_request_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/003_grant_registration_request_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-010-03-grant-users-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-010,dcl,identity,security"
+      comment: Grants the application the minimum account read and lifecycle access.
+      changes:
+        - sqlFile:
+            path: 004_grant_users_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/004_grant_users_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-011-02-grant-user-credentials-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-011,dcl,identity,security"
+      comment: Grants credential writes and non-secret metadata reads without exposing password hashes.
+      changes:
+        - sqlFile:
+            path: 005_grant_user_credentials_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/005_grant_user_credentials_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-012-03-grant-user-verification-codes-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-012,dcl,identity,security"
+      comment: Grants OTP workflow access without exposing code hashes for reads.
+      changes:
+        - sqlFile:
+            path: 006_grant_user_verification_codes_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/006_grant_user_verification_codes_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-012-05-grant-identity-authentication-secret-function-execute
+      author: FreinierCardona
+      labels: "hu-db-012,dcl,identity,security,function"
+      comment: Grants the application only the authentication hash lookups required by the documented identity flows.
+      changes:
+        - sqlFile:
+            path: 007_grant_identity_authentication_secret_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/007_grant_identity_authentication_secret_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-013-04-grant-user-sessions-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-013,dcl,identity,security"
+      comment: Grants session lifecycle access without exposing refresh-token hashes for reads.
+      changes:
+        - sqlFile:
+            path: 008_grant_user_sessions_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/008_grant_user_sessions_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-014-02-grant-user-emergency-settings-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-014,dcl,profile,security"
+      comment: Grants the application only the SOS message personalization lifecycle access.
+      changes:
+        - sqlFile:
+            path: 009_grant_user_emergency_settings_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/009_grant_user_emergency_settings_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-015-03-grant-emergency-contacts-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-015,dcl,contacts,security"
+      comment: Grants the application the emergency-contact lifecycle access.
+      changes:
+        - sqlFile:
+            path: 010_grant_emergency_contacts_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/010_grant_emergency_contacts_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-016-03-grant-user-device-tokens-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-016,dcl,notification,security"
+      comment: Grants the application only the FCM token lifecycle access required by the notification flow.
+      changes:
+        - sqlFile:
+            path: 011_grant_user_device_tokens_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/011_grant_user_device_tokens_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-017-03-grant-emergencies-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-017,dcl,emergency,security"
+      comment: Grants the application only the SOS emergency lifecycle access.
+      changes:
+        - sqlFile:
+            path: 012_grant_emergencies_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/012_grant_emergencies_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-018-03-grant-emergency-status-history-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-018,dcl,emergency,security"
+      comment: Grants append-only emergency lifecycle history access to the application role.
+      changes:
+        - sqlFile:
+            path: 013_grant_emergency_status_history_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/013_grant_emergency_status_history_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-019-03-grant-emergency-locations-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-019,dcl,emergency,security"
+      comment: Grants confirmed emergency location reads and inserts to the application role.
+      changes:
+        - sqlFile:
+            path: 014_grant_emergency_locations_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/014_grant_emergency_locations_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-020-03-grant-emergency-evidences-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-020,dcl,emergency,security"
+      comment: Grants the application confirmed emergency evidence reads and inserts only.
+      changes:
+        - sqlFile:
+            path: 015_grant_emergency_evidences_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/015_grant_emergency_evidences_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-021-03-grant-emergency-chat-messages-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-021,dcl,emergency,security"
+      comment: Grants the application emergency chat reads and inserts only.
+      changes:
+        - sqlFile:
+            path: 016_grant_emergency_chat_messages_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/016_grant_emergency_chat_messages_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-022-03-grant-emergency-notification-attempts-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-022,dcl,notification,security"
+      comment: Grants the application FCM attempt creation and result-update access only.
+      changes:
+        - sqlFile:
+            path: 017_grant_emergency_notification_attempts_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/017_grant_emergency_notification_attempts_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-023-03-grant-audit-logs-minimum-access
+      author: FreinierCardona
+      labels: "hu-db-023,dcl,audit,grants"
+      comment: Limits application access to reading and appending audit events.
+      changes:
+        - sqlFile:
+            path: 018_grant_audit_logs_minimum_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/018_grant_audit_logs_minimum_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-024-02-grant-identity-lifecycle-delete-access
+      author: FreinierCardona
+      labels: "hu-db-024,dcl,identity,security"
+      comment: Grants the application only the deletes required by identity cleanup and terminal account deletion.
+      changes:
+        - sqlFile:
+            path: 019_grant_identity_lifecycle_delete_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/019_grant_identity_lifecycle_delete_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-025-02-grant-registration-request-origin-terms-read-access
+      author: FreinierCardona
+      labels: "hu-db-025,dcl,identity,security,fix"
+      comment: Grants the application only the registration-request fields needed to complete account creation.
+      changes:
+        - sqlFile:
+            path: 020_grant_registration_request_origin_terms_read_access.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/020_grant_registration_request_origin_terms_read_access.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-028-04-grant-registration-flow-proof-hash-function
+      author: FreinierCardona
+      labels: "hu-db-028,dcl,identity,security,function"
+      comment: Grants the application only the continuation-proof hash lookup needed by v2 registration.
+      changes:
+        - sqlFile:
+            path: 021_grant_registration_flow_proof_hash_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/021_grant_registration_flow_proof_hash_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-029-03-grant-bootstrap-entity-admin-function-execute
+      author: FreinierCardona
+      labels: "bootstrap-admin,dcl,identity,security,function"
+      comment: Allows only alertamujer_app to execute the development administrator bootstrap function.
+      changes:
+        - sqlFile:
+            path: 022_grant_bootstrap_entity_admin_function_execute.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/03_dcl/01_grants/022_grant_bootstrap_entity_admin_function_execute.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
