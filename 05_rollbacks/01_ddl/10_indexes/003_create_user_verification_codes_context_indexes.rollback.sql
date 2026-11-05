@@ -1,0 +1,3 @@
+DROP INDEX identity.ix_user_verification_codes_expires_at;
+DROP INDEX identity.ix_user_verification_codes_registration_request_id;
+DROP INDEX identity.ix_user_verification_codes_user_id;

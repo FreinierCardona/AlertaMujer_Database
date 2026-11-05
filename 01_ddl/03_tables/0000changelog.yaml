@@ -1,0 +1,241 @@
+databaseChangeLog:
+  - changeSet:
+      id: AM-BD-008-01-create-system-configuration-table
+      author: FreinierCardona
+      labels: "hu-db-008,ddl,configuration,table"
+      comment: Creates the typed singleton for approved AlertaMujer operational settings.
+      changes:
+        - sqlFile:
+            path: 001_create_system_configuration_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/001_create_system_configuration_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-009-01-create-registration-requests-table
+      author: FreinierCardona
+      labels: "hu-db-009,ddl,identity,table"
+      comment: Creates the temporary registration request aggregate with protected credentials.
+      changes:
+        - sqlFile:
+            path: 002_create_registration_requests_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/002_create_registration_requests_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-010-01-create-users-table
+      author: FreinierCardona
+      labels: "hu-db-010,ddl,identity,table"
+      comment: Creates the canonical account identity with documented role and lifecycle integrity.
+      changes:
+        - sqlFile:
+            path: 003_create_users_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/003_create_users_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-011-01-create-user-credentials-table
+      author: FreinierCardona
+      labels: "hu-db-011,ddl,identity,table"
+      comment: Creates the isolated permanent password credential for each account.
+      changes:
+        - sqlFile:
+            path: 004_create_user_credentials_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/004_create_user_credentials_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-012-01-create-user-verification-codes-table
+      author: FreinierCardona
+      labels: "hu-db-012,ddl,identity,table"
+      comment: Creates protected OTP persistence bound to exactly one identity context.
+      changes:
+        - sqlFile:
+            path: 005_create_user_verification_codes_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/005_create_user_verification_codes_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-013-01-create-user-sessions-table
+      author: FreinierCardona
+      labels: "hu-db-013,ddl,identity,table"
+      comment: Creates revocable renewable sessions without persisting clear refresh tokens.
+      changes:
+        - sqlFile:
+            path: 006_create_user_sessions_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/006_create_user_sessions_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-014-01-create-user-emergency-settings-table
+      author: FreinierCardona
+      labels: "hu-db-014,ddl,profile,table"
+      comment: Creates the optional per-user SOS message personalization.
+      changes:
+        - sqlFile:
+            path: 007_create_user_emergency_settings_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/007_create_user_emergency_settings_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-015-01-create-emergency-contacts-table
+      author: FreinierCardona
+      labels: "hu-db-015,ddl,contacts,table"
+      comment: Creates the consented emergency-contact relationship between registered users.
+      changes:
+        - sqlFile:
+            path: 008_create_emergency_contacts_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/008_create_emergency_contacts_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-016-01-create-user-device-tokens-table
+      author: FreinierCardona
+      labels: "hu-db-016,ddl,notification,table"
+      comment: Creates the per-device Android FCM token registry with invalidation integrity.
+      changes:
+        - sqlFile:
+            path: 009_create_user_device_tokens_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/009_create_user_device_tokens_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-017-01-create-emergencies-table
+      author: FreinierCardona
+      labels: "hu-db-017,ddl,emergency,table"
+      comment: Creates the SOS emergency aggregate root with current lifecycle-state integrity.
+      changes:
+        - sqlFile:
+            path: 010_create_emergencies_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/010_create_emergencies_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-018-01-create-emergency-status-history-table
+      author: FreinierCardona
+      labels: "hu-db-018,ddl,emergency,table"
+      comment: Creates the immutable ordered emergency lifecycle history.
+      changes:
+        - sqlFile:
+            path: 011_create_emergency_status_history_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/011_create_emergency_status_history_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-019-01-create-emergency-locations-table
+      author: FreinierCardona
+      labels: "hu-db-019,ddl,emergency,table"
+      comment: Creates confirmed emergency location points with geographic integrity.
+      changes:
+        - sqlFile:
+            path: 012_create_emergency_locations_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/012_create_emergency_locations_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-020-01-create-emergency-evidences-table
+      author: FreinierCardona
+      labels: "hu-db-020,ddl,emergency,table"
+      comment: Creates confirmed emergency photograph metadata without binary file storage.
+      changes:
+        - sqlFile:
+            path: 013_create_emergency_evidences_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/013_create_emergency_evidences_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-021-01-create-emergency-chat-messages-table
+      author: FreinierCardona
+      labels: "hu-db-021,ddl,emergency,table"
+      comment: Creates idempotent emergency chat messages with stable server-side ordering.
+      changes:
+        - sqlFile:
+            path: 014_create_emergency_chat_messages_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/014_create_emergency_chat_messages_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-022-01-create-emergency-notification-attempts-table
+      author: FreinierCardona
+      labels: "hu-db-022,ddl,notification,table"
+      comment: Creates one traceable FCM attempt per emergency and eligible contact.
+      changes:
+        - sqlFile:
+            path: 015_create_emergency_notification_attempts_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/015_create_emergency_notification_attempts_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false
+  - changeSet:
+      id: AM-BD-023-01-create-audit-logs-table
+      author: FreinierCardona
+      labels: "hu-db-023,ddl,audit,table"
+      comment: Creates immutable administrative and security audit events with account deletion cleanup.
+      changes:
+        - sqlFile:
+            path: 016_create_audit_logs_table.sql
+            relativeToChangelogFile: true
+            stripComments: false
+      rollback:
+        - sqlFile:
+            path: ../../05_rollbacks/01_ddl/03_tables/016_create_audit_logs_table.rollback.sql
+            relativeToChangelogFile: true
+            stripComments: false

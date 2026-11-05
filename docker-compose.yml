@@ -1,0 +1,108 @@
+name: ${COMPOSE_PROJECT_NAME:-alertamujer-db}
+
+# =============================================================================
+# BASE DE DATOS ÚNICA DE ALERTAMUJER
+#
+# Uso:
+#   docker compose up
+#
+# PostgreSQL inicia primero y Liquibase aplica los changesets pendientes
+# cuando el healthcheck de la base de datos es satisfactorio.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    container_name: ${POSTGRES_CONTAINER_NAME:-alertamujer_db}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: ["postgres", "-p", "${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      POSTGRES_CONTAINER_PORT: ${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}
+      APP_DB_USER: ${APP_DB_USER:?APP_DB_USER is required in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required in .env}
+      MIGRATOR_DB_USER: ${MIGRATOR_DB_USER:?MIGRATOR_DB_USER is required in .env}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD:?MIGRATOR_DB_PASSWORD is required in .env}
+      TZ: UTC
+      PGTZ: UTC
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}"
+    volumes:
+      - alertamujer_db_data:/var/lib/postgresql/data
+      - ./docker/initdb/10-create-application-role.sh:/docker-entrypoint-initdb.d/10-create-application-role.sh:ro
+    networks:
+      - alertamujer_db_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -p \"$$POSTGRES_CONTAINER_PORT\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    shm_size: 256mb
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  liquibase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: alertamujer-liquibase:4.33
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+    networks:
+      - alertamujer_db_network
+    entrypoint:
+      - liquibase
+      - --search-path=/workspace
+      - --changeLogFile=changelog/changelog-master.yaml
+      - --url=jdbc:postgresql://postgres:${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}/${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      - --username=${MIGRATOR_DB_USER:?MIGRATOR_DB_USER is required in .env}
+      - --password=${MIGRATOR_DB_PASSWORD:?MIGRATOR_DB_PASSWORD is required in .env}
+    command: ["update"]
+
+  bootstrap-admin:
+    image: postgres:17.11-alpine3.24
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      liquibase:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGPORT: ${POSTGRES_CONTAINER_PORT:?POSTGRES_CONTAINER_PORT is required in .env}
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      PGUSER: alertamujer_app
+      PGPASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required in .env}
+      ADMIN_BOOTSTRAP_ENABLED: ${ADMIN_BOOTSTRAP_ENABLED:-false}
+      ADMIN_BOOTSTRAP_USERNAME: ${ADMIN_BOOTSTRAP_USERNAME:-}
+      ADMIN_BOOTSTRAP_FIRST_NAMES: ${ADMIN_BOOTSTRAP_FIRST_NAMES:-}
+      ADMIN_BOOTSTRAP_LAST_NAMES: ${ADMIN_BOOTSTRAP_LAST_NAMES:-}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      ADMIN_BOOTSTRAP_PHONE: ${ADMIN_BOOTSTRAP_PHONE:-}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+    volumes:
+      - ./docker/bootstrap-admin.sh:/usr/local/bin/bootstrap-admin:ro
+    networks:
+      - alertamujer_db_network
+    entrypoint: ["/bin/sh", "/usr/local/bin/bootstrap-admin"]
+
+volumes:
+  alertamujer_db_data:
+    name: ${POSTGRES_VOLUME_NAME:-alertamujer_db_data}
+
+networks:
+  alertamujer_db_network:
+    name: ${POSTGRES_NETWORK_NAME:-alertamujer_db_network}
